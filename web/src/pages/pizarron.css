@@ -1,0 +1,104 @@
+/* SPDX-License-Identifier: Apache-2.0 */
+
+/*
+ * Pizarrón: OBS / vMix browser-source overlay. Everything here is scoped to
+ * <html data-overlay="true">, set by the page while it is mounted, so the
+ * transparent background never leaks into the other routes. These rules are
+ * intentionally outside any cascade layer so they beat the themed base styles.
+ */
+:root[data-overlay="true"],
+:root[data-overlay="true"] body {
+  background: transparent;
+  overflow: hidden;
+  min-height: 0;
+}
+
+:root[data-overlay="true"] :focus-visible {
+  outline: none;
+}
+
+.overlay-root {
+  position: fixed;
+  inset: 0;
+  display: flex;
+  flex-direction: column;
+  /* Safe area: 5 % margins on every side. */
+  padding: 5vh 5vw;
+  overflow: hidden;
+  pointer-events: none;
+  user-select: none;
+  font-family: system-ui, -apple-system, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+}
+
+.overlay-root[data-align="bottom"] {
+  justify-content: flex-end;
+}
+
+.overlay-root[data-align="top"] {
+  justify-content: flex-start;
+}
+
+.overlay-captions {
+  display: flex;
+  flex-direction: column;
+  gap: 0.2em;
+  width: 100%;
+  margin: 0;
+}
+
+.overlay-captions[data-bg="band"] {
+  padding: 0.35em 0.6em;
+  border-radius: 0.2em;
+  background: rgba(0, 0, 0, 0.62);
+}
+
+.overlay-line {
+  margin: 0;
+  color: #ffffff;
+  font-weight: 600;
+  line-height: 1.25;
+  text-align: center;
+  overflow-wrap: anywhere;
+  /* Outline + shadow so the text reads on any video, light or dark. */
+  paint-order: stroke fill;
+  -webkit-text-stroke: 0.045em rgba(0, 0, 0, 0.85);
+  text-shadow:
+    0 0 0.08em #000,
+    0 0.04em 0.1em #000,
+    0 0 0.3em rgba(0, 0, 0, 0.9);
+}
+
+.overlay-line[data-interim="true"] {
+  color: #d4d4d8;
+  font-weight: 500;
+}
+
+.overlay-error {
+  position: fixed;
+  top: 0.5rem;
+  left: 0.5rem;
+  max-width: calc(100vw - 1rem);
+  margin: 0;
+  padding: 0.25rem 0.5rem;
+  border-radius: 0.25rem;
+  background: #b91c1c;
+  color: #ffffff;
+  font: 600 14px/1.25 system-ui, sans-serif;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.overlay-tag {
+  position: fixed;
+  top: 0.5rem;
+  right: 0.5rem;
+  margin: 0;
+  padding: 0.2rem 0.4rem;
+  border-radius: 0.2rem;
+  background: rgba(0, 0, 0, 0.6);
+  color: #ffffff;
+  font: 600 11px/1 system-ui, sans-serif;
+  letter-spacing: 0.08em;
+  opacity: 0.8;
+}

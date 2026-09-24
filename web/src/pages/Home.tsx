@@ -1,5 +1,6 @@
 // SPDX-License-Identifier: Apache-2.0
 import { useEffect } from 'react';
+import { Link } from 'react-router-dom';
 import { DryRunBadge } from '../components/DryRunBadge';
 import { StageCard } from '../components/StageCard';
 import { useStages } from '../lib/useStages';
@@ -43,6 +44,12 @@ export function Home() {
           ))}
         </section>
       )}
+
+      <p className="text-sm text-ink-muted">
+        <Link to="/mangrullo" className="underline hover:text-ink">
+          Operations (Mangrullo)
+        </Link>
+      </p>
     </div>
   );
 }

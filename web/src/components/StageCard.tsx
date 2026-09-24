@@ -13,6 +13,10 @@ export function StageCard({ stage }: StageCardProps) {
     (tag) => `${languageLabel(deriveShortCode(tag))} (${tag})`,
   );
   const headingId = `stage-${stage.id}-name`;
+  const firstSource = stage.source_lang[0];
+  const overlayHref = firstSource
+    ? `/pizarron/${encodeURIComponent(stage.id)}?lang=${encodeURIComponent(deriveShortCode(firstSource))}`
+    : `/pizarron/${encodeURIComponent(stage.id)}`;
 
   return (
     <article
@@ -34,13 +38,19 @@ export function StageCard({ stage }: StageCardProps) {
         <dt className="text-ink-muted">Listeners</dt>
         <dd>{stage.listeners}</dd>
       </dl>
-      <Link
-        to={`/fogon/${encodeURIComponent(stage.id)}`}
-        className="mt-auto inline-flex w-fit items-center rounded-md bg-accent px-4 py-2 font-semibold text-accent-ink hover:opacity-90"
-      >
-        Open Fogón · live captions
-        <span className="sr-only"> for {stage.name}</span>
-      </Link>
+      <div className="mt-auto flex flex-wrap items-center gap-x-4 gap-y-2">
+        <Link
+          to={`/fogon/${encodeURIComponent(stage.id)}`}
+          className="inline-flex w-fit items-center rounded-md bg-accent px-4 py-2 font-semibold text-accent-ink hover:opacity-90"
+        >
+          Open Fogón · live captions
+          <span className="sr-only"> for {stage.name}</span>
+        </Link>
+        <Link to={overlayHref} className="text-sm text-accent underline">
+          Overlay (Pizarrón)
+          <span className="sr-only"> for {stage.name}</span>
+        </Link>
+      </div>
     </article>
   );
 }
