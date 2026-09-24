@@ -234,6 +234,7 @@ class Settings(BaseSettings):
     log_level: str = "INFO"
     ws_max_conn_per_ip: int = Field(default=50, ge=1)
     ffmpeg_bin: str = "ffmpeg"
+    web_dist: Path | None = None  # built frontend; default: web/dist next to the package
 
     @model_validator(mode="after")
     def _key_required_for_gemini(self) -> Settings:

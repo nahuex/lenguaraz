@@ -8,7 +8,7 @@ UV ?= uv
 NPM ?= npm
 COMPOSE ?= docker compose
 
-.PHONY: help verify dev up demo smoke-stt smoke-translate simulate samples mvp-check \
+.PHONY: help verify dev up demo web smoke-stt smoke-translate simulate samples mvp-check \
         license-check spdx-check docs-check fresh-clone-test hooks
 
 help: ## List targets
@@ -22,14 +22,17 @@ verify: ## ruff + mypy + pytest + frontend build + SPDX headers (must be green b
 	else echo "verify: no web/ yet (feature 001) - skipping frontend build"; fi
 	@$(MAKE) --no-print-directory spdx-check
 
-dev: ## Run the API with auto-reload (feature 001)
-	@echo "dev: not implemented yet (feature 001)"; exit 1
+dev: ## Run the API with auto-reload on http://127.0.0.1:8000 (ENGINE=fake for a dry run)
+	$(UV) run lenguaraz serve --host 127.0.0.1 --reload
 
 up: ## Start the whole stack with Docker Compose (feature 001)
 	@echo "up: not implemented yet (feature 001)"; exit 1
 
-demo: ## Start the bundled sample stages (feature 001)
-	@echo "demo: not implemented yet (feature 001)"; exit 1
+demo: ## Serve the bundled sample stages from stages.yaml (dry run: ENGINE=fake make demo)
+	$(UV) run lenguaraz serve
+
+web: ## Build the audience view into web/dist
+	cd web && $(NPM) ci --no-audit --no-fund && $(NPM) run build
 
 smoke-stt: ## Real Gemini call: transcribe a sample clip (feature 001; uses quota)
 	@echo "smoke-stt: not implemented yet (feature 001)"; exit 1
