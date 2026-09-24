@@ -17,9 +17,9 @@ help: ## List targets
 verify: ## ruff + mypy + pytest + frontend build + SPDX headers (must be green before every commit)
 	@if [ -f pyproject.toml ]; then \
 		$(UV) run ruff check . && $(UV) run ruff format --check . && $(UV) run mypy && $(UV) run pytest -q; \
-	else echo "verify: no pyproject.toml yet (feature 001) — skipping Python checks"; fi
+	else echo "verify: no pyproject.toml yet (feature 001) - skipping Python checks"; fi
 	@if [ -f web/package.json ]; then cd web && $(NPM) run build; \
-	else echo "verify: no web/ yet (feature 001) — skipping frontend build"; fi
+	else echo "verify: no web/ yet (feature 001) - skipping frontend build"; fi
 	@$(MAKE) --no-print-directory spdx-check
 
 dev: ## Run the API with auto-reload (feature 001)

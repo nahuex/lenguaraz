@@ -1,9 +1,9 @@
 # STATE
 
-- Now (UTC): 2026-09-24T15:36Z — Window opened 2026-09-24T15:00:00Z (first session started 15:07Z)
-- Current milestone: M0 Kickoff (deadline 2026-09-24T15:40Z) — projected slip ~15 min (waiting on owner inputs for NOTICE + commit identity)
-- Done: PHASE 1 tooling preflight (python 3.14 · uv 0.12.18 · node 24 · docker 29 running · ffmpeg 9.0.2 · gh 2.101 authed as nahuex · git 2.55; MISSING: make, gitleaks (docker fallback works), Gemini Docs MCP, gemini skills) · PHASE 2 governance files (19/20; `.env.example` pending deny-rule fix) · H0 answered (Q1–Q6) · T-000 partial: git init (main), origin=git@github.com:nahuex/lenguaraz.git (repo public, empty), verbatim Apache-2.0 LICENSE (sha256 cfc7749b…), .gitignore, .gitattributes, Makefile stubs, scripts/spdx_check.sh, .githooks/pre-commit (gitleaks + spdx), README stub, docs/decisions.md, HUMAN_INBOX.md; 27 files staged, hook dry-run green
-- In progress: T-000 — waiting for owner: full name (NOTICE), commit identity, settings.json deny-rule edit, `make` install, MCP + skills install · GT-2..GT-8/GT-10 re-verification workflow running in background (official docs, adversarial recheck)
-- Next 3: T-000 commit + push + GitHub license check · /specify 001 · /specify 002
-- Risks: `make` not installed on the owner's machine (Makefile is the project interface) · Gemini Docs MCP only available after the restart · owner's global git identity uses a work email (nahuel.cortes@visma.com) — confirm before pushing to a public repo
+- Now (UTC): 2026-09-24T15:48Z — Window opened 2026-09-24T15:00:00Z (first session started 15:07Z)
+- Current milestone: M0 Kickoff (deadline 15:40Z) — T-000 done at 15:46Z; remaining exit criterion "specs 001+002 approved" projected ~16:30Z (≈50 min slip, absorbed before M1 18:30Z)
+- Done: PHASE 1 tooling (python 3.14 · uv 0.12.18 · node 24 · docker 29 · ffmpeg 9.0.2 · make 4.4.1 · gitleaks 8.30.1 · gh authed as nahuex · git 2.55; owner reports Gemini Docs MCP + gemini skills installed, verified after restart) · PHASE 2 governance files · H0 answered · **T-000 bootstrap: commit `06ef354` pushed to `main` on the public repo https://github.com/nahuex/lenguaraz — GitHub API reports license Apache-2.0** (verbatim Apache-2.0 LICENSE, NOTICE, .gitignore, .gitattributes, Makefile, spdx-check, pre-commit hook, README stub, docs/decisions.md) · ground truth re-verified against official docs (no drift; GT-13 model IDs added)
+- In progress: single restart so CLAUDE.md, slash commands, MCP and skills load natively → then `/kickoff`
+- Next 3: /specify 001 · /specify 002 · /plan 001
+- Risks: `.env.example` + `.env` still not created — `.claude/settings.json` deny list must read `Read(./.env)` + `Read(./.env.local)` (owner's edit left `Read(./.env.*)` in place); GEMINI_API_KEY not yet in `.env` → `make smoke-*` and `make samples` blocked until then · NOTICE copyright name "Nahuel Cortes" derived from git identity, owner to confirm spelling · MCP availability unverified until restart
 - Cuts applied: none
