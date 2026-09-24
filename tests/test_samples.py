@@ -16,6 +16,7 @@ from lenguaraz.tools.samples import (
     Clip,
     SampleSpec,
     build_sample,
+    decode_tts_audio,
     join_with_gaps,
     rate_from_mime,
     read_script,
@@ -61,6 +62,19 @@ def test_rate_from_mime() -> None:
     assert rate_from_mime("audio/L16;codec=pcm;rate=24000") == 24000
     assert rate_from_mime("audio/L16;codec=pcm;rate=48000") == 48000
     assert rate_from_mime(None) == 24000
+
+
+def test_decode_tts_audio_handles_raw_pcm_and_wav(tmp_path: Path) -> None:
+    raw = decode_tts_audio(b"\x01\x00" * 10, "audio/L16;codec=pcm;rate=48000")
+    assert raw.rate == 48000 and len(raw.pcm) == 20
+    path = tmp_path / "tts.wav"
+    with wave.open(str(path), "wb") as handle:
+        handle.setnchannels(1)
+        handle.setsampwidth(2)
+        handle.setframerate(24000)
+        handle.writeframes(b"\x02\x00" * 5)
+    clip = decode_tts_audio(path.read_bytes(), "audio/wav")
+    assert clip.rate == 24000 and clip.pcm == b"\x02\x00" * 5
 
 
 def test_resample_halves_length_ratio_and_keeps_signal() -> None:

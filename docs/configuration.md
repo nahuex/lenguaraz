@@ -23,6 +23,9 @@ editing files.
 | `GEMINI_INTERPRETER_MODEL` | model id | `gemini-3.5-live-translate-preview` | Speech-to-speech model for the optional spoken interpreter (feature 010). |
 | `GEMINI_TTS_MODEL` | model id | `gemini-3.8-flash-lite-tts` | Text-to-speech model used by `make samples` to generate the bundled test audio. |
 | `STT_MODE` | `SMART` \| `VERBATIM` | `SMART` | `SMART` removes filler words and formats numbers, lists and punctuation; `VERBATIM` keeps every disfluency. |
+| `VAD_MODE` | `hybrid` \| `server` | `hybrid` | `hybrid` detects the end of speech locally (RMS below `VAD_THRESHOLD` for `VAD_SILENCE_MS`) and tells the Live API to finalize the turn at once; `server` relies on the server's own silence timeout (slower, sometimes only at stream end). |
+| `VAD_SILENCE_MS` | integer 100–5000 | `500` | Silence after speech before the end-of-turn signal is sent (hybrid mode). |
+| `VAD_THRESHOLD` | integer 1–20000 | `300` | RMS level (16-bit scale) below which a 100 ms chunk counts as silence. Raise it for noisy rooms. |
 | `SESSION_ROTATE_SECONDS` | integer 30–600 | `540` | Live sessions last about 10 minutes; a new session is opened proactively after this many seconds (and on the server's `GoAway`). |
 | `PROGRESSIVE_TRANSLATION` | boolean | `true` | Translate the stable prefix of partial captions so translated lines appear before the sentence ends (feature 002). |
 | `LOG_TRANSCRIPTS` | boolean | `false` | When `true`, caption text is written to the logs. Off by default for privacy. |

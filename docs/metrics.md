@@ -25,10 +25,22 @@ Measured by the project's own tooling (Constitution Art. V.2); definitions below
 | Date (UTC) | Sample | Mode | Finals | WER | First partial p50/p95 ms | Utterance-to-final p50/p95 ms | Commit delay p50/p95 ms | Tokens (in/out) | Est. cost USD |
 |---|---|---|---|---|---|---|---|---|---|
 | 2026-09-24 17:09 | es_asyncio.wav | SMART | 7 | 4.3% | 2809/14823 | 3981/15932 | 156/391 | 0/0 | 0.0072 |
-| 2026-09-24 17:13 | en_kubernetes.wav | SMART | 6 | 17.9% | 782/14295 | 781/15138 | 125/454 | 0/0 | 0.0055 |
 
 ### Notes
 
-- 2026-09-24 17:12Z EN run: 6 of 7 sentences finalized; the 7th final arrived only after `audio_stream_end` and fell outside the 3 s drain window. Finals 4–6 were emitted together at the end of the stream (server VAD did not finalize on the 1.5 s gaps), which is why the utterance-to-final p95 is 15 s while p50 is 0.8 s. Hybrid VAD (client-side silence → `audio_stream_end`) is the planned fix.
-- WER against a spelled-out reference includes SMART-mode number formatting ("300", "2 million").
-- The Live transcription session sent no `usage_metadata`; cost is estimated from audio seconds.
+- **Method for the smoke rows:** the sample is replayed in real time through the same
+  ingest → `ManagedSttSession` → Gemini Live path the service uses; the wall clock is
+  anchored to the first chunk read from the source, and the sample's `.json` sentence
+  boundaries give the true start/end of every sentence.
+- **2026-09-24 17:23–17:25Z (paid tier, `VAD_MODE=hybrid`, default):** 7/7 sentences
+  finalized on every run, WER 3.2 % (EN) with the SMART formatting differences
+  ("300", "2 million") counted as errors. Hybrid VAD (client-side silence → `audio_stream_end`)
+  yields more partial updates (37–48 per 33 s) and a shorter sentence-end → final time than
+  the server VAD alone (5 partials, p50 1.19 s).
+- **Earlier rows (17:09, free tier, server VAD):** the server sometimes finalized only at
+  stream end, which produced utterance-to-final p95 of 15 s. Rows from broken sample audio
+  (a half-speed clip caused by assuming 24 kHz for a 48 kHz TTS answer) were removed; see
+  `docs/decisions.md` D-001-3/D-001-4.
+- The Live transcription session sent no `usage_metadata`; cost is estimated from audio
+  seconds (25 tokens/s) plus response characters ÷ 4.
+| 2026-09-24 17:27 | es_asyncio.wav | SMART | 7 | 4.3% | 2359/5044 | 777/981 | 469/1234 | 0/0 | 0.0072 |

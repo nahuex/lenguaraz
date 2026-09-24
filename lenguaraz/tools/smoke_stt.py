@@ -19,7 +19,14 @@ from collections.abc import Sequence
 from datetime import UTC, datetime
 from pathlib import Path
 
-from lenguaraz.config import ConfigError, EngineKind, StageConfig, StagesFile, load_settings
+from lenguaraz.config import (
+    ConfigError,
+    EngineKind,
+    StageConfig,
+    StagesFile,
+    VadMode,
+    load_settings,
+)
 from lenguaraz.ingest import open_source
 from lenguaraz.logsetup import configure_logging
 from lenguaraz.metrics import percentile
@@ -152,13 +159,25 @@ async def run(sample: Path, stage: StageConfig, mode: str | None, verbose: bool 
     def on_state(state: StageState, detail: str | None) -> None:
         print(f"\n[state] {state.value} {detail or ''}")
 
-    session = ManagedSttSession(stage, engine, emit=emit, on_state=on_state, rotate_seconds=540)
+    session = ManagedSttSession(
+        stage,
+        engine,
+        emit=emit,
+        on_state=on_state,
+        rotate_seconds=540,
+        vad_silence_ms=settings.vad_silence_ms if settings.vad_mode is VadMode.HYBRID else None,
+        vad_threshold=settings.vad_threshold,
+    )
     queue: asyncio.Queue[bytes | None] = asyncio.Queue(maxsize=50)
     source = open_source(str(sample), ffmpeg_bin=settings.ffmpeg_bin, realtime=True, loop=False)
+
+    anchor: list[float] = []  # wall time of the first chunk read from the source
 
     async def pump() -> None:
         try:
             async for chunk in source.chunks():
+                if not anchor:
+                    anchor.append(time.monotonic())
                 await queue.put(chunk)
         finally:
             await queue.put(None)
@@ -173,7 +192,7 @@ async def run(sample: Path, stage: StageConfig, mode: str | None, verbose: bool 
     hypothesis = " ".join(segment.text for _, segment in finals)
     wer = word_error_rate(reference, hypothesis) if reference else float("nan")
     final_lat = [s.latency_ms for _, s in finals]
-    stream_start = session.stream_start or start_wall
+    stream_start = anchor[0] if anchor else (session.stream_start or start_wall)
     utt = utterance_latencies(boundaries, finals, stream_start)
     first = first_partial_latencies(boundaries, finals, interims, stream_start)
     stats = session.stats
@@ -183,7 +202,9 @@ async def run(sample: Path, stage: StageConfig, mode: str | None, verbose: bool 
     print("\n=== smoke-stt summary ===")
     print(f"sample: {sample}  mode: {settings.stt_mode.value}  model: {settings.gemini_stt_model}")
     print(f"finals: {len(finals)}  interims: {len(interims)}  sessions: {stats.sessions_opened}")
-    print(f"errors: {stats.errors}  rotations: {stats.rotations}")
+    print(f"errors: {stats.errors}  rotations: {stats.rotations}  vad_signals: {stats.vad_signals}")
+    vad = f"{settings.vad_mode.value} ({settings.vad_silence_ms} ms, rms {settings.vad_threshold})"
+    print(f"vad: {vad}")
     print(f"WER vs reference: {wer:.1%}" if reference else "WER: no reference transcript")
     if boundaries:
         print(f"first partial after sentence start p50/p95: {fmt_p(first)} ms")

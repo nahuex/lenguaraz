@@ -14,6 +14,7 @@ Output: 16 kHz mono 16-bit WAV (the format the STT engine consumes, GT-3.1). Use
 from __future__ import annotations
 
 import argparse
+import io as _io
 import json
 import re
 import shutil
@@ -68,6 +69,21 @@ Synthesizer = Callable[[str, SampleSpec], Clip]
 def read_script(path: Path) -> list[str]:
     lines = path.read_text(encoding="utf-8").splitlines()
     return [line.strip() for line in lines if line.strip() and not line.startswith("#")]
+
+
+def decode_tts_audio(data: bytes, mime_type: str | None) -> Clip:
+    """Turn a TTS ``inline_data`` part into raw PCM + rate.
+
+    ``audio/L16;codec=pcm;rate=N`` is raw PCM (3.8 Flash TTS answers at 48 kHz);
+    ``audio/wav`` (3.8 Flash-Lite TTS) carries a RIFF header that the ``wave`` module reads.
+    """
+    mime = mime_type or ""
+    if mime.startswith("audio/wav") or data[:4] == b"RIFF":
+        with wave.open(_io.BytesIO(data), "rb") as handle:
+            if handle.getnchannels() != 1 or handle.getsampwidth() != 2:
+                raise RuntimeError(f"unexpected TTS WAV layout: {handle.getparams()}")
+            return Clip(handle.readframes(handle.getnframes()), handle.getframerate(), mime)
+    return Clip(data, rate_from_mime(mime), mime)
 
 
 def rate_from_mime(mime_type: str | None, default: int = DEFAULT_TTS_RATE) -> int:
@@ -257,8 +273,9 @@ def gemini_synthesizer(api_key: str, model: str) -> Synthesizer:
         for candidate in response.candidates or []:
             for part in (candidate.content.parts if candidate.content else None) or []:
                 if part.inline_data and part.inline_data.data:
-                    mime = part.inline_data.mime_type or ""
-                    return Clip(bytes(part.inline_data.data), rate_from_mime(mime), mime)
+                    return decode_tts_audio(
+                        bytes(part.inline_data.data), part.inline_data.mime_type
+                    )
         raise RuntimeError(f"TTS returned no audio for: {text[:40]}…")
 
     return synthesize

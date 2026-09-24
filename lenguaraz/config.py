@@ -34,6 +34,7 @@ __all__ = [
     "StagesFile",
     "SttMode",
     "TalkInfo",
+    "VadMode",
     "short_code",
 ]
 
@@ -57,6 +58,11 @@ class EngineKind(StrEnum):
 class SttMode(StrEnum):
     VERBATIM = "VERBATIM"
     SMART = "SMART"
+
+
+class VadMode(StrEnum):
+    SERVER = "server"  # rely on the server's automatic VAD only
+    HYBRID = "hybrid"  # client-side silence detection sends audio_stream_end (fast finalization)
 
 
 def short_code(language: str) -> str:
@@ -224,6 +230,9 @@ class Settings(BaseSettings):
     gemini_interpreter_model: str = "gemini-3.5-live-translate-preview"
     gemini_tts_model: str = "gemini-3.8-flash-lite-tts"
     stt_mode: SttMode = SttMode.SMART
+    vad_mode: VadMode = VadMode.HYBRID
+    vad_silence_ms: int = Field(default=500, ge=100, le=5000)
+    vad_threshold: int = Field(default=300, ge=1, le=20000)
     session_rotate_seconds: int = Field(default=540, ge=30, le=600)
     progressive_translation: bool = True
     log_transcripts: bool = False

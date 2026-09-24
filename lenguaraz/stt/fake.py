@@ -52,6 +52,7 @@ class ScriptedSttSession:
         self._hold_open = hold_open
         self.sent = bytearray()
         self.ended = False
+        self.end_of_stream_calls = 0
         self.closed = False
         self._closed_event = asyncio.Event()
 
@@ -62,6 +63,7 @@ class ScriptedSttSession:
 
     async def end_of_stream(self) -> None:
         self.ended = True
+        self.end_of_stream_calls += 1
 
     async def events(self) -> AsyncIterator[SttEvent]:
         for delay, event in self._script:
@@ -119,7 +121,7 @@ class FakeSttSession:
         self._gap_ms = gap_ms
         self._loop = loop
         self._audio_ms = 0.0
-        self._ended = False
+        self.end_of_stream_calls = 0
         self._closed = False
         self._progress = asyncio.Event()
 
@@ -128,8 +130,8 @@ class FakeSttSession:
         self._progress.set()
 
     async def end_of_stream(self) -> None:
-        self._ended = True
-        self._progress.set()
+        # Hybrid VAD signals turn ends; the dry-run script keeps pacing on audio.
+        self.end_of_stream_calls += 1
 
     async def close(self) -> None:
         self._closed = True
@@ -138,7 +140,7 @@ class FakeSttSession:
     async def _wait_until(self, target_ms: float) -> bool:
         """Block until the audio position reaches ``target_ms``. False if the stream ended."""
         while self._audio_ms < target_ms:
-            if self._closed or self._ended:
+            if self._closed:
                 return False
             self._progress.clear()
             await self._progress.wait()

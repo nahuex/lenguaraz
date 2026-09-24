@@ -15,7 +15,7 @@ from collections.abc import Callable
 from typing import Any
 
 from lenguaraz.bus.base import Bus
-from lenguaraz.config import Settings, StageConfig, StagesFile, short_code
+from lenguaraz.config import Settings, StageConfig, StagesFile, VadMode, short_code
 from lenguaraz.ingest import AudioSource, IngestError, open_source
 from lenguaraz.metrics import StageMetrics
 from lenguaraz.models import CaptionEvent, MetricsEvent, StageState, StatusEvent
@@ -85,6 +85,10 @@ class StageRunner:
             emit=self._emit,
             on_state=self._on_session_state,
             rotate_seconds=float(self._settings.session_rotate_seconds),
+            vad_silence_ms=(
+                self._settings.vad_silence_ms if self._settings.vad_mode is VadMode.HYBRID else None
+            ),
+            vad_threshold=self._settings.vad_threshold,
         )
         source: AudioSource | None = None
         pump: asyncio.Task[None] | None = None

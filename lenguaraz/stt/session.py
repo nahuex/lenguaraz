@@ -15,8 +15,10 @@ from __future__ import annotations
 
 import asyncio
 import contextlib
+import math
 import random
 import time
+from array import array
 from collections.abc import Awaitable, Callable
 from dataclasses import dataclass, field
 
@@ -51,6 +53,7 @@ class SessionStats:
     prompt_tokens: int = 0
     response_tokens: int = 0
     total_tokens: int = 0
+    vad_signals: int = 0
     last_detail: str | None = None
     states: list[StageState] = field(default_factory=list)
 
@@ -64,6 +67,8 @@ class ManagedSttSession:
         emit: Callable[[Segment], None],
         on_state: StateCallback,
         rotate_seconds: float = 540.0,
+        vad_silence_ms: int | None = None,
+        vad_threshold: int = 300,
         max_reconnects: int = 5,
         backoff_base: float = 0.5,
         backoff_cap: float = 10.0,
@@ -84,6 +89,8 @@ class ManagedSttSession:
         self._sleep = sleep
         self._clock = clock
         self._rng = rng
+        self._vad_silence_ms = vad_silence_ms
+        self._vad_threshold = vad_threshold
         self.stats = SessionStats()
         self.state = StageState.IDLE
         self.session_id: str | None = None
@@ -197,9 +204,10 @@ class ManagedSttSession:
                 sender_error = sender.exception()
                 if sender_error is not None:
                     return "error", f"send failed: {sender_error}"
-                await self._safe(session.end_of_stream())
-                with contextlib.suppress(asyncio.TimeoutError, Exception):
-                    await asyncio.wait_for(asyncio.shield(receiver), self._drain_seconds)
+                if self.stats.bytes_sent:
+                    await self._safe(session.end_of_stream())
+                    with contextlib.suppress(asyncio.TimeoutError, Exception):
+                        await asyncio.wait_for(asyncio.shield(receiver), self._drain_seconds)
                 return "done", None
             if receiver in done:
                 receiver_error = receiver.exception()
@@ -221,6 +229,14 @@ class ManagedSttSession:
         await asyncio.sleep(self._rotate_seconds)
 
     async def _sender(self, session: SttSession, chunks: asyncio.Queue[bytes | None]) -> None:
+        """Forward audio; in hybrid VAD mode, signal ``audio_stream_end`` after speech + silence.
+
+        The Live transcription guide describes hybrid VAD: server-side detection of speech
+        start, client-side detection of the end, so the server finalizes the turn at once
+        instead of waiting for its own silence timeout.
+        """
+        speech_seen = False
+        silence_ms = 0
         while True:
             chunk = await chunks.get()
             if chunk is None:
@@ -229,6 +245,18 @@ class ManagedSttSession:
                 self._start_wall = self._clock()
             await session.send(chunk)
             self.stats.bytes_sent += len(chunk)
+            if self._vad_silence_ms is None:
+                continue
+            if chunk_rms(chunk) >= self._vad_threshold:
+                speech_seen = True
+                silence_ms = 0
+            elif speech_seen:
+                silence_ms += len(chunk) // BYTES_PER_MS
+                if silence_ms >= self._vad_silence_ms:
+                    await session.end_of_stream()
+                    self.stats.vad_signals += 1
+                    speech_seen = False
+                    silence_ms = 0
 
     async def _receiver(self, session: SttSession) -> tuple[str, str | None]:
         async for event in session.events():
@@ -273,3 +301,12 @@ class ManagedSttSession:
     async def _safe(awaitable: Awaitable[None]) -> None:
         with contextlib.suppress(Exception):
             await awaitable
+
+
+def chunk_rms(chunk: bytes) -> float:
+    """Root mean square of a s16le chunk (0 for empty)."""
+    samples = array("h")
+    samples.frombytes(chunk[: len(chunk) - len(chunk) % 2])
+    if not samples:
+        return 0.0
+    return math.sqrt(sum(v * v for v in samples) / len(samples))
