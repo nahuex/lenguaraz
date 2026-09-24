@@ -85,6 +85,7 @@ class StageConfig(BaseModel):
     targets: list[str] = Field(default_factory=list)
     talk: TalkInfo = Field(default_factory=TalkInfo)
     glossary: list[str] = Field(default_factory=list)
+    loop: bool = False  # replay a file source forever (demo stages)
 
     @field_validator("id")
     @classmethod
