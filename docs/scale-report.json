@@ -69,7 +69,7 @@
       "errors": 0,
       "rotations": 0,
       "audio_seconds": 59.9,
-      "est_cost_usd": 0.0117
+      "est_cost_usd": 0.0
     },
     {
       "id": "sim-04",
@@ -84,7 +84,7 @@
       "errors": 0,
       "rotations": 0,
       "audio_seconds": 59.9,
-      "est_cost_usd": 0.0115
+      "est_cost_usd": 0.0
     },
     {
       "id": "sim-05",
@@ -99,7 +99,7 @@
       "errors": 0,
       "rotations": 0,
       "audio_seconds": 59.9,
-      "est_cost_usd": 0.0117
+      "est_cost_usd": 0.0
     },
     {
       "id": "sim-06",
@@ -114,7 +114,7 @@
       "errors": 0,
       "rotations": 0,
       "audio_seconds": 59.9,
-      "est_cost_usd": 0.0115
+      "est_cost_usd": 0.0
     },
     {
       "id": "sim-07",
@@ -129,7 +129,7 @@
       "errors": 0,
       "rotations": 0,
       "audio_seconds": 59.9,
-      "est_cost_usd": 0.0117
+      "est_cost_usd": 0.0
     },
     {
       "id": "sim-08",
@@ -144,7 +144,7 @@
       "errors": 0,
       "rotations": 0,
       "audio_seconds": 59.9,
-      "est_cost_usd": 0.0115
+      "est_cost_usd": 0.0
     },
     {
       "id": "sim-09",
@@ -159,7 +159,7 @@
       "errors": 0,
       "rotations": 0,
       "audio_seconds": 59.9,
-      "est_cost_usd": 0.0117
+      "est_cost_usd": 0.0
     },
     {
       "id": "sim-10",
@@ -174,7 +174,7 @@
       "errors": 0,
       "rotations": 0,
       "audio_seconds": 59.9,
-      "est_cost_usd": 0.0115
+      "est_cost_usd": 0.0
     }
   ],
   "honesty": "2 real Gemini stage(s) and 8 simulated stage(s) (fake engines replaying the bundled samples) ran in one process for 60 s; CPU/RSS cover the whole process; cost covers the real stages only."

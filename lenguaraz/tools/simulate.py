@@ -231,7 +231,7 @@ async def simulate(
         result.final_state = row.get("state", "")
         result.errors = int(row.get("errors", 0))
         result.rotations = int(row.get("rotations", 0))
-        result.est_cost_usd = float(row.get("est_cost_usd", 0.0))
+        result.est_cost_usd = float(row.get("est_cost_usd", 0.0)) if result.real else 0.0
         result.audio_seconds = float(row.get("audio_seconds", 0.0))
 
     real_results = [r for r in results.values() if r.real]
@@ -377,7 +377,8 @@ def render_markdown(report: Report) -> str:
         "",
         "- Every stage is an independent pipeline (ingest, STT, bus, translation fan-out) in one",
         "  process, with one listener per language subscribed like a browser would be.",
-        "- Commit delay = time between the last partial and the final caption (`latency_ms`).",
+        "- Commit delay = time between the last partial and the final caption (`latency_ms`);",
+        "  0 when the server sent a final without partials.",
         "- Translation latency = time from the final caption to its translation being published.",
         "- Cost = measured audio seconds x 25 tokens/s at the STT price + measured translation",
         f"  tokens, prices read on {report.pricing_date}; simulated stages cost nothing and are",
