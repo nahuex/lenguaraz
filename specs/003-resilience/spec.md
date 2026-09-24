@@ -1,6 +1,6 @@
 # Spec 003 — resilience
 
-**Status:** Approved · **Owner:** human · **Author:** agent · **Created:** 2026-09-24T21:03Z
+**Status:** Shipped · **Owner:** human · **Author:** agent · **Created:** 2026-09-24T21:03Z
 **Constitution:** v1.0.0 · **Backlog row:** product.md §6 #003
 
 ## 1. Why
@@ -61,3 +61,4 @@ delays the first captions. It moves **Latency** (no caption gap) and **Quality/O
 
 ## Changelog
 - 2026-09-24T21:03Z created; Status Approved (non-blocking defaults, HUMAN_INBOX S3-1).
+- 2026-09-24T21:28Z Shipped: rotation proven with forced rotations on the real engine (docs/metrics.md); `last_rotation_gap_ms` documented as including the natural pause.
