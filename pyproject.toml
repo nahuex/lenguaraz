@@ -1,0 +1,69 @@
+[project]
+name = "lenguaraz"
+version = "0.1.0"
+description = "The open-source interpreter for every stage: real-time transcription and translation for multi-track conferences."
+readme = "README.md"
+license = "Apache-2.0"
+requires-python = ">=3.12"
+authors = [{ name = "Nahuel Cortes" }]
+keywords = ["captions", "transcription", "translation", "gemini", "conference", "live"]
+dependencies = [
+    "fastapi>=0.115",
+    "uvicorn[standard]>=0.30",
+    "pydantic>=2.8",
+    "pydantic-settings>=2.4",
+    "pyyaml>=6.0",
+    "google-genai>=1.0",
+]
+
+[project.scripts]
+lenguaraz = "lenguaraz.cli:main"
+
+[project.urls]
+Homepage = "https://github.com/nahuex/lenguaraz"
+Repository = "https://github.com/nahuex/lenguaraz"
+
+[dependency-groups]
+dev = [
+    "pytest>=8.3",
+    "pytest-asyncio>=0.24",
+    "httpx>=0.27",
+    "ruff>=0.6",
+    "mypy>=1.11",
+    "types-PyYAML>=6.0",
+    "jiwer>=3.0",
+]
+
+[build-system]
+requires = ["hatchling>=1.26"]
+build-backend = "hatchling.build"
+
+[tool.hatch.build.targets.wheel]
+packages = ["lenguaraz"]
+
+[tool.ruff]
+line-length = 100
+target-version = "py312"
+extend-exclude = ["web", ".venv"]
+
+[tool.ruff.lint]
+select = ["E", "F", "I", "UP", "B", "ASYNC", "SIM", "RUF"]
+ignore = ["RUF012"]
+
+[tool.ruff.lint.per-file-ignores]
+"tests/*" = ["ASYNC"]
+
+[tool.mypy]
+python_version = "3.12"
+packages = ["lenguaraz"]
+check_untyped_defs = true
+warn_unused_ignores = true
+warn_redundant_casts = true
+no_implicit_optional = true
+ignore_missing_imports = true
+
+[tool.pytest.ini_options]
+asyncio_mode = "auto"
+testpaths = ["tests"]
+addopts = "-q"
+filterwarnings = ["error::RuntimeWarning"]
