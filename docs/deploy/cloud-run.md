@@ -36,7 +36,7 @@ gcloud run deploy lenguaraz \
 ```
 
 `--timeout 3600` is the Cloud Run maximum for HTTP/WebSocket requests: audience browsers
-reconnect automatically when the hour is up (the Fogón client backs off and resumes).
+reconnect automatically when the hour is up (the live captions client backs off and resumes).
 `--no-cpu-throttling` keeps the CPU allocated between requests, which the ffmpeg decoders
 and the Live session need. `--session-affinity` keeps a browser on the same instance if you
 ever run more than one.
@@ -57,7 +57,7 @@ then `source: /media/talk.mp4`). See `docs/deploy/audio-sources.md`.
 ```bash
 URL=$(gcloud run services describe lenguaraz --region "$REGION" --format 'value(status.url)')
 curl -s "$URL/healthz"
-open "$URL/fogon/main"
+open "$URL/live/main"
 ```
 
 Cloud Run's filesystem is read-only except `/tmp`, the container runs as the non-root user

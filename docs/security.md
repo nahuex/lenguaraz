@@ -10,7 +10,7 @@ CI hardening live in [`SECURITY.md`](../SECURITY.md).
 | Asset | Threat | Built in | You add |
 |---|---|---|---|
 | Gemini API key | Leak to a browser, a log line or the repo | Server-side only (`SecretStr`), never sent to clients; gitleaks in pre-commit and CI | `.env` on the server only, `chmod 600`, a paid-tier project with a spend cap |
-| Operator API (`/api/admin/*`, `/mangrullo`) | Strangers starting/stopping stages or downloading transcripts | `ADMIN_TOKEN` Bearer, constant-time compare, `401` otherwise | A long random token, TLS, optionally an IP allowlist at the proxy |
+| Operator API (`/api/admin/*`, `/admin`) | Strangers starting/stopping stages or downloading transcripts | `ADMIN_TOKEN` Bearer, constant-time compare, `401` otherwise | A long random token, TLS, optionally an IP allowlist at the proxy |
 | Audience socket (`/ws/{stage}`) | Connection floods, slow readers, injected messages | Per-IP limit, bounded queues, read-only socket (only `ping` is accepted) | TLS, real client IPs forwarded by the proxy |
 | Prompts | A speaker, a glossary or an abstract steering the translation model | Delimited data, angle brackets neutralized, length and output caps | Review glossaries and abstracts before the event |
 | Container | Escalation after a bug | Non-root, read-only filesystem, `no-new-privileges`, Trivy scans | A patched host; port 8000 not published to the internet |
@@ -40,7 +40,7 @@ create a new one and restart the container.
 Every route under `/api/admin/` (stage table with cost, start, stop, transcript export) goes
 through `require_admin` in `lenguaraz/api/admin.py`: the request must carry
 `Authorization: Bearer <ADMIN_TOKEN>`, compared with `hmac.compare_digest` (constant time);
-anything else gets `401`. The Mangrullo page asks for the token once and keeps it in the
+anything else gets `401`. The Admin page asks for the token once and keeps it in the
 browser's `sessionStorage` (key `lenguaraz.adminToken`), never in the URL.
 
 The default `change-me-long-random` is a placeholder. Generate a real one and put it in
@@ -51,9 +51,9 @@ openssl rand -hex 32     # or: python3 -c "import secrets; print(secrets.token_u
 ```
 
 To rotate it, edit `.env` and restart (`docker compose up -d`); the old token dies at once
-and operators re-enter the new one in Mangrullo. There is no lockout or attempt limit on
+and operators re-enter the new one in the Admin page. There is no lockout or attempt limit on
 `401`s, so the token must be long and sit behind TLS; if the production team works from a
-known network, restrict `/api/admin/` and `/mangrullo` to it at the proxy.
+known network, restrict `/api/admin/` and `/admin` to it at the proxy.
 
 ```bash
 curl -H "Authorization: Bearer $ADMIN_TOKEN" https://captions.example.org/api/admin/stages
@@ -171,7 +171,7 @@ treat any credential that ever sat in a `source` URL as exposed if that feed fai
 - [ ] `ADMIN_TOKEN` is long and random; `GEMINI_API_KEY` is from a paid-tier project with a
       spend cap; `.env` is `chmod 600`.
 - [ ] TLS proxy in front; port 8000 bound to loopback; `FORWARDED_ALLOW_IPS` set for the proxy.
-- [ ] `/api/admin/` and `/mangrullo` reachable only by the production team (network or VPN).
+- [ ] `/api/admin/` and `/admin` reachable only by the production team (network or VPN).
 - [ ] `WS_MAX_CONN_PER_IP` sized for the venue NAT (audience size ÷ public addresses).
 - [ ] No credentials inside `source` URLs; glossaries and abstracts reviewed.
 - [ ] `curl https://<host>/healthz` returns `"status":"ok"` through the proxy; someone knows

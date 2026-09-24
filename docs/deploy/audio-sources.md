@@ -110,7 +110,7 @@ port (`- "9000:9000/udp"` in `docker-compose.yml`).
 ### Interpreter booth or mixer feeds
 
 Give each interpreter channel its own stage (`source_lang: ["es-419"]`, `targets: ["en"]`),
-fed by its own SRT port; the audience picks the stage and language in Fogón.
+fed by its own SRT port; the audience picks the stage and language on the live captions page.
 
 ## Latency tips
 

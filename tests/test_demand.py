@@ -1,5 +1,5 @@
 # SPDX-License-Identifier: Apache-2.0
-"""Spec 002 — FR-002-04, AC-2, NFR-002-05: Baqueano language demand."""
+"""Spec 002 — FR-002-04, AC-2, NFR-002-05: language demand."""
 
 from __future__ import annotations
 

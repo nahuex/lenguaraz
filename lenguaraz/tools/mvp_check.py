@@ -145,7 +145,9 @@ def run(settings: Settings, stages_path: Path, seconds: float) -> list[Gate]:
                 for c in collect_captions(client, target_stage.id, "es", seconds)
                 if c.lang == "es"
             ]
-            translated = [c for c in spanish if c.original and c.original != c.text]
+            translated = [
+                c for c in spanish if c.original and c.original != c.text and not c.degraded
+            ]
             if translated:
                 by_id["MVP-4"].status = "PASS"
                 by_id["MVP-4"].note = f"{target_stage.id} → es “{translated[0].text[:60]}”"

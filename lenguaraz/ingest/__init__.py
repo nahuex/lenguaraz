@@ -1,5 +1,5 @@
 # SPDX-License-Identifier: Apache-2.0
-"""Oído — audio ingest: files, streams and devices become 16 kHz mono PCM chunks."""
+"""Audio ingest — files, streams and devices become 16 kHz mono PCM chunks."""
 
 from lenguaraz.ingest.base import (
     BYTES_PER_MS,

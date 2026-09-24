@@ -12,7 +12,7 @@ docker compose up --build
 ```
 
 Open http://localhost:8000. You should see two stages ("Main Stage" and "Workshop Room")
-with a **DRY-RUN** badge. Click **Open Fogón · live captions** on a stage: captions appear within a few
+with a **DRY-RUN** badge. Click **Open live captions** on a stage: captions appear within a few
 seconds, word by word, from the bundled samples. `http://localhost:8000/healthz` returns
 `{"status":"ok","engine":"fake","stages":2,…}`.
 
@@ -48,7 +48,7 @@ stages:
     glossary: ["Kubernetes", "eBPF", "YourProductName"]
 ```
 
-Restart the container (`docker compose restart`). Share `http://<your-host>:8000/fogon/main`
+Restart the container (`docker compose restart`). Share `http://<your-host>:8000/live/main`
 with the audience. Anything ffmpeg can read works as a `source`; `docs/deploy/audio-sources.md` has
 copy-paste recipes for OBS, vMix, HLS and SRT. For a public deployment with TLS see
 `docs/deploy/production.md`; for Google Cloud, `docs/deploy/cloud-run.md`.
@@ -71,6 +71,7 @@ make verify                      # lint, types, tests, frontend build, SPDX head
 |---|---|
 | Stage shows `STOPPED` with `cannot open WAV` / `ffmpeg exited` | The `source` path or URL is wrong, or ffmpeg is missing → fix the path, install ffmpeg or set `FFMPEG_BIN`. |
 | Stage shows `DEGRADED` with `quota exhausted (429…)` | Free-tier limits or the 10-minute spend cap → enable billing on the project, or reduce concurrent stages. |
+| Captions show an `original` marker / stage detail says `rate limited (429)` | The Gemini project is on the **free tier** for the text model (`generate_content_free_tier_requests`, 15 requests/min): translations pause for the time the server asks and the original text is shown meanwhile → link a Cloud Billing account to the AI Studio project (Tier 1); until then set `PROGRESSIVE_TRANSLATION=false` and keep one target language. |
 | Stage shows `STOPPED` with `authentication failed` | Wrong `GEMINI_API_KEY` → paste the key from AI Studio into `.env`. |
 | Stage shows `ROTATING` for a moment every ~9 minutes | Normal: the Live session lifetime is 10 minutes; Lenguaraz opens the next session before that and switches at a pause (no sentence is lost). |
 | Captions stop while the speaker talks | The stall watchdog reopens the session after `STT_STALL_SECONDS`; if it repeats, check the audio level (`docs/troubleshooting.md`). |

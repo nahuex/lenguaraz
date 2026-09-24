@@ -17,7 +17,7 @@ editing files.
 |---|---|---|---|
 | `ENGINE` | `gemini` \| `fake` | `gemini` | `gemini` uses the Gemini Live API; `fake` is a credential-free dry run that replays the reference transcripts next to the samples and shows a DRY-RUN badge in every page. |
 | `GEMINI_API_KEY` | secret string | *(empty)* | Required when `ENGINE=gemini`. Server-side only; never sent to browsers or written to logs. Create it in Google AI Studio on a project with billing enabled. |
-| `ADMIN_TOKEN` | string | `change-me-long-random` | Bearer token for the operator endpoints (Mangrullo, feature 004). Change it before any real event. |
+| `ADMIN_TOKEN` | string | `change-me-long-random` | Bearer token for the operator endpoints (Admin page, feature 004). Change it before any real event. |
 | `GEMINI_STT_MODEL` | model id | `gemini-3.5-transcribe-live` | Live transcription model. |
 | `GEMINI_TRANSLATE_MODEL` | model id | `gemini-3.5-flash-lite` | Text model used for translation (feature 002). |
 | `GEMINI_INTERPRETER_MODEL` | model id | `gemini-3.5-live-translate-preview` | Speech-to-speech model for the optional spoken interpreter (feature 010). |
@@ -28,14 +28,14 @@ editing files.
 | `VAD_THRESHOLD` | integer 1–20000 | `300` | RMS level (16-bit scale) below which a 100 ms chunk counts as silence. Raise it for noisy rooms. |
 | `SESSION_ROTATE_SECONDS` | integer 30–600 | `540` | Live sessions last about 10 minutes; a new session is opened proactively after this many seconds (and on the server's `GoAway`). |
 | `STT_STALL_SECONDS` | integer 0–300 | `20` | Stall watchdog: if speech (chunks above `VAD_THRESHOLD`) keeps arriving but the transcription session sends nothing for this long, the session is closed and reopened (counted as `stalls` in the stage snapshot). `0` disables. |
-| `ROTATION_DRAIN_SECONDS` | number 0–30 | `3` | After the audio feed switches to the next Live session, the old one stays open this long to deliver its last final captions (Posta, make-before-break). |
+| `ROTATION_DRAIN_SECONDS` | number 0–30 | `3` | After the audio feed switches to the next Live session, the old one stays open this long to deliver its last final captions (make-before-break session rotation). |
 | `ROTATION_SWAP_MAX_WAIT_SECONDS` | number 0–60 | `8` | With hybrid VAD, the audio feed switches to the next session at the next pause so no sentence is split; if no pause is detected within this many seconds the switch happens anyway. |
 | `DEDUPE_WINDOW_SECONDS` | number 0–60 | `5` | A final caption whose words match one already published within this window is dropped (late duplicates from the old session). |
 | `PROGRESSIVE_TRANSLATION` | boolean | `true` | Translate a debounced partial caption so a provisional translated line appears before the sentence ends; the final replaces it. |
 | `PROGRESSIVE_MIN_WORDS` | integer 1–50 | `6` | Minimum words in a partial caption before it is translated progressively. |
 | `PROGRESSIVE_DEBOUNCE_MS` | integer 100–5000 | `600` | Minimum time between two progressive translations of the same utterance and language. |
 | `ALWAYS_ON_LANGS` | comma-separated short codes | `es` | Languages translated even when nobody is listening (so transcripts and exports exist), restricted to each stage's `targets`. |
-| `LANG_GRACE_SECONDS` | number 0–600 | `10` | A language stays active this long after its last listener leaves (Baqueano, D8). |
+| `LANG_GRACE_SECONDS` | number 0–600 | `10` | A language stays active this long after its last listener leaves (language demand, D8). |
 | `LANG_RECONCILE_DEBOUNCE_MS` | integer 0–5000 | `250` | Documented upper bound for reacting to listener changes; the demand is evaluated at every caption, so a new listener is served by the next final. |
 | `TRANSLATE_CONTEXT_SEGMENTS` | integer 0–10 | `3` | Previous (source, translation) pairs sent as context to keep terminology and tense consistent. |
 | `TRANSLATE_MAX_OUTPUT_TOKENS` | integer 16–8192 | `512` | Cap on the translation length per segment. |
@@ -72,7 +72,7 @@ stages:
 
 | Field | Type | Default | Description |
 |---|---|---|---|
-| `id` | string | required | Stage identifier used in URLs (`/fogon/{id}`, `/ws/{id}`). Must be unique. |
+| `id` | string | required | Stage identifier used in URLs (`/live/{id}`, `/overlay/{id}`, `/ws/{id}`). Must be unique. |
 | `name` | string | required | Display name (1–80 chars). |
 | `source` | string | required | Anything ffmpeg can read: a file path, an HLS URL, `rtmp://`, `srt://`, or a device. See `docs/deploy/audio-sources.md` (feature 008). |
 | `source_lang` | list of BCP-47 tags | `[]` | Language hint(s) for the speaker. Empty enables automatic detection, including code-switching. Explicit tags improve accuracy. |

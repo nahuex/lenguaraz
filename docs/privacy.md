@@ -72,7 +72,7 @@ notice in the speaker briefing and on the captions page covers both. Suggested t
 > conference; captions may be exported as a transcript. Captions can contain errors.
 
 Speakers who do not want their talk transcribed can be left out: remove the stage from
-`stages.yaml` or press **Stop** in Mangrullo for that slot.
+`stages.yaml` or press **Stop** in the Admin page for that slot.
 
 ## GDPR-style notes
 

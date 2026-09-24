@@ -28,22 +28,22 @@ escenario y cada persona lo entiende en su idioma.
   pausa, glosario por escenario para sesgar el reconocimiento.
 - **Muchos escenarios a la vez**, cada uno en su pipeline aislado con estado visible
   (`IDLE · STARTING · LIVE · ROTATING · DEGRADED · STOPPED`) y reconexión automática.
-- **Vista de audiencia (Fogón):** selector de escenario e idioma, tamaño de fuente, alto
-  contraste, modo oscuro, subtítulos accesibles para lectores de pantalla, WebSocket con
-  reconexión.
-- **Traducción en vivo (Parla)** a cualquier cantidad de idiomas con `gemini-3.5-flash-lite`:
+- **Subtítulos en vivo (vista de audiencia):** selector de escenario e idioma, tamaño de
+  fuente, alto contraste, modo oscuro, subtítulos accesibles para lectores de pantalla,
+  WebSocket con reconexión.
+- **Traducción en vivo** a cualquier cantidad de idiomas con `gemini-3.5-flash-lite`:
   en streaming, respetando el glosario, con las frases anteriores como contexto; solo se
   traduce mientras alguien escucha (o si el idioma está en `ALWAYS_ON_LANGS`), y una falla de
   traducción degrada al texto original en vez de silencio.
-- **Rotación de sesión sin cortes (Posta):** la Live API cierra la sesión a los ~10 minutos;
+- **Rotación de sesión sin cortes:** la Live API cierra la sesión a los ~10 minutos;
   la siguiente se abre antes, el cambio ocurre en una pausa y los finales se drenan y
   deduplican. Medido con el motor real: 0 frases perdidas, 0 duplicadas en rotaciones forzadas.
-- **Panel de operación (Mangrullo)** detrás de un Bearer token: tabla de escenarios con
+- **Admin (panel de operación)** detrás de un Bearer token: tabla de escenarios con
   estado, latencia y costo estimado, start/stop, exportación de transcripciones **SRT / VTT /
-  TXT** (Acta) por idioma.
-- **Overlay para OBS (Pizarrón):** una página transparente para browser source con
+  TXT** por idioma.
+- **Overlay (para OBS):** una página transparente para browser source con
   `?lang=&lines=&size=`.
-- **Auto-glosario (Diccionario):** términos técnicos y nombres propios derivados del título y
+- **Auto-glosario:** términos técnicos y nombres propios derivados del título y
   el abstract de la charla con salida estructurada de Gemini, agregados después de tu lista
   manual.
 - **Modo dry-run** (`ENGINE=fake`) que ejercita toda la interfaz sin credenciales.
@@ -60,8 +60,8 @@ cp .env.example .env      # poné GEMINI_API_KEY=… (o ENGINE=fake para un dry-
 docker compose up --build
 ```
 
-Después abrí http://localhost:8000 y hacé clic en **Open Fogón · live captions** en un
-escenario. Recorrido completo, camino de desarrollo y resolución de problemas:
+Después abrí http://localhost:8000 y hacé clic en **Open live captions** en un escenario.
+Recorrido completo, camino de desarrollo y resolución de problemas:
 [docs/es/quickstart.md](docs/es/quickstart.md).
 
 **Requisitos:** Docker (o Python 3.12 + [uv](https://docs.astral.sh/uv/) + Node 24 + ffmpeg
@@ -71,31 +71,29 @@ usá un proyecto con facturación habilitada para eventos reales. **Modelos** (t
 configurables): `gemini-3.5-transcribe-live` (subtítulos), `gemini-3.5-flash-lite`
 (traducción), `gemini-3.8-flash-lite-tts` (audio de prueba).
 
-## Nombres
+## Componentes
 
-Los componentes llevan nombres del mundo del lenguaraz en la superficie (interfaz, rutas,
-métricas, docs) y nombres técnicos descriptivos en el código:
+Cada componente lleva un nombre estándar en la superficie (interfaz, rutas, docs) y un
+módulo técnico en el código:
 
-| Nombre | Componente | Módulo | Significado |
-|---|---|---|---|
-| **Oído** | Ingesta de audio (ffmpeg) | `ingest/` | Escucha el escenario |
-| **Lengua** | Transcripción en vivo | `stt/` | Convierte la voz en palabras |
-| **Parla** | Traducción de texto a varios idiomas | `translate/` | Lo dice en todos los idiomas |
-| **Posta** | Rotación de sesión make-before-break | `stt/session.py` | Las postas donde los chasques cambiaban de caballo sin detener el mensaje |
-| **Baqueano** | Reconciliador de demanda de idiomas | `translate/demand.py` | El guía que sabe qué caminos abrir y cuáles cerrar |
-| **Chasque** | Bus de eventos y fan-out a la audiencia | `bus/` | El mensajero que lleva la palabra a todos |
-| **Fogón** (`/fogon/{stage}`) | Vista de audiencia | `web/src/pages/Fogon.tsx` | Donde la gente se junta a escuchar |
-| **Mangrullo** (`/mangrullo`) | Monitoreo y administración | `web/src/pages/Mangrullo.tsx`, `api/admin.py` | La torre de vigilancia de la frontera |
-| **Pizarrón** (`/pizarron/{stage}`) | Overlay para OBS/vMix | `web/src/pages/Pizarron.tsx` | El pizarrón de la pulpería, a la vista de todos |
-| **Diccionario** | Glosario + auto-glosario | `glossary/` | El saber del lenguaraz |
-| **Acta** | Exportación SRT/VTT/TXT | `export.py` | El registro escrito del parlamento |
+| Componente | Código | Qué hace |
+|---|---|---|
+| Ingesta de audio | `lenguaraz/ingest/` | ffmpeg o lector de WAV → chunks PCM mono de 16 kHz |
+| Transcripción | `lenguaraz/stt/` | Sesión de la Gemini Live API: subtítulos parciales y finales, VAD híbrido, rotación de sesión, watchdog de estancamiento |
+| Traducción | `lenguaraz/translate/` | Workers por idioma, prompts que respetan el glosario, según demanda (solo los idiomas con oyentes) |
+| Bus de eventos | `lenguaraz/bus/` | Fan-out acotado a los clientes WebSocket; los parciales pueden descartarse, los finales nunca |
+| Glosario | `lenguaraz/glossary/` | Lista manual + auto-glosario a partir del título y el abstract de la charla (salida estructurada) |
+| Exportación de transcripciones | `lenguaraz/export.py` | Transcripción en memoria por escenario e idioma, SRT/VTT/TXT |
+| Página de subtítulos en vivo | `web/src/pages/LiveCaptions.tsx` (`/live/{stage}`) | Vista de audiencia: escenario, idioma, tamaño de fuente, contraste, modo oscuro |
+| Overlay (para OBS) | `web/src/pages/Overlay.tsx` (`/overlay/{stage}`) | Browser source transparente para OBS/vMix |
+| Admin (panel de operación) | `web/src/pages/Admin.tsx`, `lenguaraz/api/admin.py` (`/admin`) | Panel de operación detrás de `ADMIN_TOKEN`: estados, latencia, costo, start/stop, exportaciones |
 
 ## Arquitectura en una imagen
 
 ```
 stages.yaml ─▶ un pipeline aislado por escenario:
-  Oído (ffmpeg / WAV) ─▶ Lengua (Gemini Live STT, parcial + final) ─▶ Chasque (bus) ─▶ WS /ws/{stage}?lang=
-                                                                                        └▶ Fogón (audiencia)
+  Ingesta (ffmpeg / WAV) ─▶ Transcripción (Gemini Live STT, parcial + final) ─▶ Bus de eventos ─▶ WS /ws/{stage}?lang=
+                                                                                                   └▶ Subtítulos en vivo (audiencia)
 ```
 
 Detalles, contrato de eventos y endpoints: [docs/architecture.md](docs/architecture.md).
@@ -168,7 +166,7 @@ pago** para eventos reales.
 - **Un proceso es dueño de sus escenarios.** Para escalar horizontalmente, varias instancias
   con archivos `stages.yaml` disjuntos; todavía no hay bus compartido (planificado, recortado
   del alcance del hackathon).
-- **Los subtítulos no se persisten.** Exportá SRT/VTT/TXT desde Mangrullo antes de detener un
+- **Los subtítulos no se persisten.** Exportá SRT/VTT/TXT desde Admin antes de detener un
   escenario.
 - **La latencia depende de la fuente.** Medida ≈0,9 s desde el fin de una oración hasta su
   subtítulo final con audio limpio (`docs/metrics.md`); las entradas HLS suman la duración de
@@ -176,7 +174,7 @@ pago** para eventos reales.
 - **La calidad depende del audio y del glosario.** Una cama musical o un micrófono lejano
   perjudican más que cualquier configuración; el glosario arregla nombres, no ruido.
 - **La Live API tiene varianza.** A veces una sesión se queda muda; el watchdog la reabre
-  después de `STT_STALL_SECONDS` y el operador lo ve como `stalls` en Mangrullo.
+  después de `STT_STALL_SECONDS` y el operador lo ve como `stalls` en Admin.
 - **Las sesiones concurrentes son una cuota del proyecto de Google**, por tier; planificalas
   antes del evento (`docs/deploy/scaling.md`).
 - La interpretación hablada, la ingesta desde el micrófono del navegador y un fallback

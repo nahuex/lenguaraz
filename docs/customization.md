@@ -10,7 +10,7 @@ deployment. Nothing about a particular conference is hardcoded.
   mid-talk. The live transcription model supports 70+ languages (`en-US`, `en-GB`, `es-419`,
   `es-US`, `pt-BR`, `pt-PT`, …).
 - **Target languages per stage:** `targets: ["es", "en", "pt"]` (short codes). The audience
-  picks among the original and the targets on the Fogón page.
+  picks among the original and the targets on the live captions page.
 - **Always-on languages:** `ALWAYS_ON_LANGS=es` translates those languages even with no
   listener, so a transcript exists for every talk. Every other target is translated only
   while someone is listening (plus a grace period), which keeps cost proportional to demand.
@@ -55,9 +55,9 @@ The audience view ships with a neutral dark theme, a light theme and a high-cont
 the visitor's browser. Event branding (name, colors, logo) is runtime configuration
 (`branding.yaml`, feature 008); logos are never committed to the repository.
 
-## OBS / vMix overlay (Pizarrón)
+## OBS / vMix overlay
 
-Add a **Browser Source** pointing at `http://<host>:8000/pizarron/<stage>?lang=es&lines=2`
+Add a **Browser Source** pointing at `http://<host>:8000/overlay/<stage>?lang=es&lines=2`
 with the canvas size of your scene; the page background is transparent. Parameters:
 
 | Parameter | Values | Default | Meaning |

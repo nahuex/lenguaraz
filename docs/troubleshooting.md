@@ -20,8 +20,9 @@ Symptom → cause → fix. Every stage state and detail is visible on the home p
 | A listener picks a language and sees nothing for ~10 s | The language had no listener and is not in `ALWAYS_ON_LANGS`; it becomes active with the next final caption | Expected on the first join; add the language to `ALWAYS_ON_LANGS` if it must always be ready |
 | Translation is right but slow (several seconds) | `GEMINI_TRANSLATE_THINKING` set above `minimal`, or long segments | Use `minimal`; keep `PROGRESSIVE_TRANSLATION=true` so a provisional line appears while the sentence is spoken |
 | WebSocket closes with `4429` | Too many caption sockets from one IP (`WS_MAX_CONN_PER_IP`) — typical behind a venue NAT | Raise `WS_MAX_CONN_PER_IP` |
+| Captions show an `original` marker / stage detail says `rate limited (429)` | The Gemini project is on the **free tier** for the text model (`generate_content_free_tier_requests`, 15 requests/min): translations pause for the time the server asks and the original text is shown meanwhile → link a Cloud Billing account to the AI Studio project (Tier 1); until then set `PROGRESSIVE_TRANSLATION=false` and keep one target language. |
 | WebSocket closes with `4413` | The client could not keep up; the server never drops final captions, so it closed the socket | The client reconnects automatically; check the network of that device |
-| `/api/admin/*` answers `401` | Missing or wrong `Authorization: Bearer <ADMIN_TOKEN>` header | Copy the token from `.env`; the Mangrullo page keeps it in session storage only |
+| `/api/admin/*` answers `401` | Missing or wrong `Authorization: Bearer <ADMIN_TOKEN>` header | Copy the token from `.env`; the Admin page keeps it in session storage only |
 | Export answers `404` with `available: [...]` | That stage produced no final caption in the requested language yet (language not active or no listener) | Pick a listed language, or add it to `ALWAYS_ON_LANGS` so it is always produced |
 | Home page says "audience view is not built yet" | Developer path without `make web` | `make web`; the Docker image builds it automatically |
 | `make smoke-stt` reports a high WER on the bundled sample | SMART mode formats numbers ("300" for "three hundred") which the reference spells out; or the audio is broken | Compare the finals by eye; regenerate samples with `make samples`; use `--mode VERBATIM` to compare |
@@ -31,7 +32,7 @@ Symptom → cause → fix. Every stage state and detail is visible on the home p
 The Live API occasionally goes quiet without closing the session (seen once in ~15 runs
 during development). The stall watchdog handles it: when audio above `VAD_THRESHOLD` keeps
 flowing but no interim or final arrives for `STT_STALL_SECONDS` (default 20), the stage
-logs `stall`, closes the session and opens a new one; the stage snapshot in Mangrullo counts
+logs `stall`, closes the session and opens a new one; the stage snapshot in the Admin page counts
 it under `stalls`. If you see stalls every few minutes, check the audio level first (a stream
 that is too quiet never triggers speech and never captions), then raise `STT_STALL_SECONDS`
 for very slow speakers or set it to `0` to disable the watchdog.

@@ -64,8 +64,8 @@ The compose file already runs the container **non-root, read-only** (`tmpfs` on 
 `no-new-privileges`), restarts it on failure and mounts `stages.yaml` and `samples/`
 read-only. The image healthcheck polls `/healthz` every 15 s.
 
-Open `https://captions.example.org/` (Home), `/fogon/<stage>` (audience),
-`/pizarron/<stage>?lang=es&lines=2` (OBS browser source) and `/mangrullo` (operators, asks
+Open `https://captions.example.org/` (Home), `/live/<stage>` (live captions for the audience),
+`/overlay/<stage>?lang=es&lines=2` (OBS browser source) and `/admin` (operators, asks
 for `ADMIN_TOKEN`).
 
 ## 5. Sizing
@@ -81,7 +81,7 @@ and check your Google project's concurrent Live session limit before adding more
 Everything that defines your deployment is three small files: `.env` (secrets — store it in
 your password manager or secret store, not in git), `stages.yaml` and `branding.yaml`
 (safe to keep in a private git repo). Captions are not persisted: export transcripts from
-Mangrullo (SRT/VTT/TXT) **before** stopping a stage if you want to keep them.
+the Admin page (SRT/VTT/TXT) **before** stopping a stage if you want to keep them.
 
 ## 7. Upgrade
 

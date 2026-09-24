@@ -69,7 +69,9 @@ class StageRunner:
         self.transcript = TranscriptStore()
         self._recorder: asyncio.Task[None] | None = None
         self._caption_chars = 0
-        self._log = logging.LoggerAdapter(log, {"stage_id": stage.id, "component": "Oído/Lengua"})
+        self._log = logging.LoggerAdapter(
+            log, {"stage_id": stage.id, "component": "ingest/transcription"}
+        )
 
     # -- lifecycle ----------------------------------------------------------------------
 
@@ -79,7 +81,7 @@ class StageRunner:
         if self._recorder is None or self._recorder.done():
             subscription = self._bus.subscribe(self.stage.id, internal=True)
             self._recorder = asyncio.create_task(
-                self._record(subscription), name=f"acta-{self.stage.id}"
+                self._record(subscription), name=f"transcript-{self.stage.id}"
             )
         self._source_error = None
         self._live_once = asyncio.Event()
@@ -102,7 +104,7 @@ class StageRunner:
         return self._task is not None and not self._task.done()
 
     async def _record(self, subscription: Any) -> None:
-        """Acta: keep every final caption (all languages) for export."""
+        """Transcript export: keep every final caption (all languages) for export."""
         try:
             async for event in subscription:
                 if isinstance(event, CaptionEvent):
@@ -123,7 +125,7 @@ class StageRunner:
                 await self._recorder
 
     async def _apply_auto_glossary(self) -> None:
-        """Diccionario: prime the glossary from the talk metadata (spec 006)."""
+        """Auto-glossary: prime the glossary from the talk metadata (spec 006)."""
         if self._auto_glossary is None or not self._settings.auto_glossary:
             return
         if not talk_text(self.stage):
@@ -328,6 +330,7 @@ class StageRunner:
             "interim_p95_ms": self.metrics.interims.p95,
             "active_languages": self.fanout.active_languages() if self.fanout else [],
             "translation_tokens": translation_usage,
+            "translation_rate_limited": self.fanout.rate_limited() if self.fanout else 0,
             "running": self.running,
             "audio_seconds": round(audio_seconds, 1),
             "est_cost_usd": round(

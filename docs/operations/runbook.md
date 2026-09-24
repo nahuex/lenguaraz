@@ -1,7 +1,7 @@
 # Operations runbook
 
-For the production team of any conference. Everything here uses the Mangrullo page
-(`/mangrullo`, needs `ADMIN_TOKEN`) or plain `curl`. Lenguaraz is stateless: restarting the
+For the production team of any conference. Everything here uses the Admin page
+(`/admin`, needs `ADMIN_TOKEN`) or plain `curl`. Lenguaraz is stateless: restarting the
 container is always safe; only in-memory transcripts not yet exported are lost.
 
 ## Event-day checklist
@@ -14,14 +14,14 @@ container is always safe; only in-memory transcripts not yet exported are lost.
 - [ ] Quota: the project's concurrent Live session limit (AI Studio) ≥ number of stages + 1
       (a rotation briefly needs two sessions per stage).
 - [ ] `docker compose up --build`, then `curl http://<host>:8000/healthz` → `"status":"ok"`.
-- [ ] Open `/mangrullo`, enter the token, confirm every stage reaches `LIVE` with a test feed;
-      open `/fogon/<stage>` on a phone over the venue Wi-Fi.
-- [ ] Share `/fogon/<stage>` links (or the home page) with the audience; give the video team the
-      overlay URLs `/pizarron/<stage>?lang=<code>&lines=2`.
+- [ ] Open `/admin`, enter the token, confirm every stage reaches `LIVE` with a test feed;
+      open `/live/<stage>` on a phone over the venue Wi-Fi.
+- [ ] Share `/live/<stage>` links (or the home page) with the audience; give the video team the
+      overlay URLs `/overlay/<stage>?lang=<code>&lines=2`.
 
 **T-1h**
 - [ ] Feeds are live: state `LIVE`, `captions_final` increasing, `detail` empty.
-- [ ] Latency p50/p95 in Mangrullo look like the rehearsal numbers (`docs/metrics.md`).
+- [ ] Latency p50/p95 in the Admin page look like the rehearsal numbers (`docs/metrics.md`).
 - [ ] Spend cap: Tier 1 allows USD 10 per rolling 10 minutes; 10 stages cost ≈ USD 0.10 per
       minute all together (`docs/cost.md`).
 
@@ -31,7 +31,7 @@ container is always safe; only in-memory transcripts not yet exported are lost.
 - A stage that shows `DEGRADED` keeps retrying on its own; see the playbooks below.
 
 **After each talk**
-- Export the transcript for every language from Mangrullo (SRT/VTT/TXT buttons) or:
+- Export the transcript for every language from the Admin page (SRT/VTT/TXT buttons) or:
 
 ```bash
 curl -H "Authorization: Bearer $ADMIN_TOKEN" \
@@ -40,7 +40,7 @@ curl -H "Authorization: Bearer $ADMIN_TOKEN" \
 
 - Timestamps are positions on the stage's audio timeline (`00:00:00` = when the stage started
   receiving audio). If the stage started before the talk, shift the file in your subtitle tool.
-- Stop stages that are finished for the day (`Stop` in Mangrullo) to stop spending.
+- Stop stages that are finished for the day (`Stop` in the Admin page) to stop spending.
 
 ## Incident playbooks
 
@@ -64,10 +64,18 @@ Export transcripts first; a restart clears in-memory transcripts.
 
 ## Stage shows `stalls` > 0
 
-**Symptom:** the Mangrullo table shows a non-zero `stalls` counter; the log has
+**Symptom:** the Admin stage table shows a non-zero `stalls` counter; the log has
 `no transcription for 20s while speech is flowing (stall)` followed by `ROTATING` → `LIVE`.
 
 **Meaning:** the transcription session stopped answering while audio kept flowing; the
 watchdog replaced it. One or two per hour is server-side variance and needs no action. Many
 per hour: check the audio level (`ffmpeg` volume, `VAD_THRESHOLD`), the Gemini status page
 and your project's concurrent-session quota; consider lowering `SESSION_ROTATE_SECONDS`.
+
+## Translations pause with `rate limited (429)`
+
+**Symptom:** stage detail `rate limited (429): translation to es paused for 57s; captions show the original text`; the audience sees the original language with an `original` marker for about a minute.
+
+**Cause:** the Gemini project is on the free tier for the text model (`generate_content_free_tier_requests`, 15 requests per minute). Two stages with progressive translation make 40–60 requests per minute.
+
+**Fix:** link a Cloud Billing account to the AI Studio project (Tier 1) — do this before the event. Mitigations meanwhile: `PROGRESSIVE_TRANSLATION=false` (halves the calls), fewer target languages, `ALWAYS_ON_LANGS` empty so only languages with listeners are translated. Lenguaraz never retries a 429; it waits for the server's hint and resumes on its own.

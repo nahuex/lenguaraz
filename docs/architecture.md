@@ -1,44 +1,44 @@
 # Architecture
 
 Lenguaraz is a single asyncio service (FastAPI) that runs one independent pipeline per
-stage and fans captions out to browsers over WebSockets. Surface names come from the
-lenguaraz's world; modules keep technical names.
+stage and fans captions out to browsers over WebSockets. Component names below are the ones
+used in the UI, the routes and the code.
 
 ```
 stages.yaml + .env ──▶ config (pydantic)
                              │
                       StageManager ── one StageRunner per stage, each in its own TaskGroup
                              │
-  file / HLS / RTMP / SRT ──▶ Oído   ingest/  (stdlib WAV reader or ffmpeg subprocess) ─▶ 3,200-byte PCM chunks
+  file / HLS / RTMP / SRT ──▶ Audio ingest    ingest/     (stdlib WAV reader or ffmpeg subprocess) ─▶ 3,200-byte PCM chunks
                              │
-                            Lengua  stt/     ManagedSttSession ─▶ Gemini Live API (gemini-3.5-transcribe-live)
-                             │               interim + final segments, seq, latency, reconnect, rotation (Posta)
+                            Transcription   stt/        ManagedSttSession ─▶ Gemini Live API (gemini-3.5-transcribe-live)
+                             │                          interim + final segments, seq, latency, reconnect, session rotation
                              │
-                            Parla   translate/  one ordered translation worker per active language (Baqueano decides which)
+                            Translation     translate/  one ordered translation worker per active language (language demand decides which)
                              │
-                            Chasque bus/     in-memory pub/sub, bounded queues, drop-oldest-interim
+                            Event bus       bus/        in-memory pub/sub, bounded queues, drop-oldest-interim
                              │
-                     api/ws.py  WS /ws/{stage}?lang=   ─▶  Fogón /fogon/{stage}  (audience)
+                     api/ws.py  WS /ws/{stage}?lang=   ─▶  Live captions /live/{stage}  (audience) · Overlay /overlay/{stage}
                      api/app.py GET /healthz · /api/stages · /api/branding · static SPA (web/dist)
 ```
 
 ## Components
 
-| Surface name | Module | Responsibility |
+| Component | Module | Responsibility |
 |---|---|---|
-| Oído | `lenguaraz/ingest/` | Turn any source into raw s16le mono 16 kHz audio in 100 ms chunks. Files replay in real time; streams pass through. One ffmpeg process per stage, terminated on stop. |
-| Lengua | `lenguaraz/stt/` | `SttEngine` interface; `GeminiSttEngine` (Live API) and `FakeSttEngine` (dry run). `ManagedSttSession` owns states, `seq`, latency, backoff and session rotation. |
-| Posta | `lenguaraz/stt/session.py` | Make-before-break rotation: on the timer (`SESSION_ROTATE_SECONDS`) or the server's `GoAway`, the next Live session is opened while the current one keeps listening; the audio feed switches once it is connected **and at the next pause** detected by the hybrid VAD (bounded by `ROTATION_SWAP_MAX_WAIT_SECONDS`), so no sentence is split; the old session gets `audio_stream_end`, drains for `ROTATION_DRAIN_SECONDS` and is closed; late duplicates are dropped (`DEDUPE_WINDOW_SECONDS`); `seq` continues; the caption gap is measured (`last_rotation_gap_ms`). |
-| Chasque | `lenguaraz/bus/` | Publish/subscribe per stage with a bounded queue per listener. Under backpressure the oldest interim is dropped first; a final or status event is never dropped (a listener that cannot keep up is closed and reconnects). |
+| Audio ingest | `lenguaraz/ingest/` | Turn any source into raw s16le mono 16 kHz audio in 100 ms chunks. Files replay in real time; streams pass through. One ffmpeg process per stage, terminated on stop. |
+| Transcription | `lenguaraz/stt/` | `SttEngine` interface; `GeminiSttEngine` (Live API) and `FakeSttEngine` (dry run). `ManagedSttSession` owns states, `seq`, latency, backoff and session rotation. |
+| Session rotation | `lenguaraz/stt/session.py` | Make-before-break rotation: on the timer (`SESSION_ROTATE_SECONDS`) or the server's `GoAway`, the next Live session is opened while the current one keeps listening; the audio feed switches once it is connected **and at the next pause** detected by the hybrid VAD (bounded by `ROTATION_SWAP_MAX_WAIT_SECONDS`), so no sentence is split; the old session gets `audio_stream_end`, drains for `ROTATION_DRAIN_SECONDS` and is closed; late duplicates are dropped (`DEDUPE_WINDOW_SECONDS`); `seq` continues; the caption gap is measured (`last_rotation_gap_ms`). |
+| Event bus | `lenguaraz/bus/` | Publish/subscribe per stage with a bounded queue per listener. Under backpressure the oldest interim is dropped first; a final or status event is never dropped (a listener that cannot keep up is closed and reconnects). |
 | — | `lenguaraz/runner.py` | `StageRunner` (ingest → session → bus, metrics ticker) and `StageManager`. A failure in one stage never affects another. |
 | — | `lenguaraz/api/` | FastAPI app: health, stage list, caption WebSocket with per-IP limits, SPA serving. |
-| Fogón | `web/src/pages/Fogon.tsx` | Audience view: stage + language, font size, contrast, dark mode, `aria-live` captions, reconnecting socket. |
-| Parla | `lenguaraz/translate/fanout.py` | One ordered worker per (stage, language): every final caption is translated with the stage glossary and the last segments as context (Interactions API, `thinking_level: minimal`); retries with backoff; on persistent failure the caption is published with `degraded: true` and the original text. Progressive translation publishes a provisional line from a debounced partial. |
-| Baqueano | `lenguaraz/translate/demand.py` | Active languages = `ALWAYS_ON_LANGS` plus languages with a listener in the last `LANG_GRACE_SECONDS`, restricted to the stage's `targets`; evaluated at every caption. |
-| Acta | `lenguaraz/export.py` | Bounded in-memory transcript per stage and language (start = first partial, end = final, on the audio timeline), fed from the bus; `GET /api/admin/stages/{id}/export?format=srt\|vtt\|txt&lang=` renders it. Nothing touches disk until an operator exports. |
-| Mangrullo | `lenguaraz/api/admin.py`, `web/src/pages/Mangrullo.tsx` | Operator API and page behind `ADMIN_TOKEN` (Bearer, constant-time compare): stage snapshots with latency, rotations, errors, duplicates, dropped chunks, token usage and estimated cost; start/stop; exports. |
-| Pizarrón | `web/src/pages/Pizarron.tsx` | Transparent overlay for OBS/vMix browser sources: `/pizarron/{stage}?lang=&lines=2&size=l&align=bottom&bg=band`. |
-| Diccionario | feature 006 | Auto-glossary from talk title and abstract. |
+| Live captions page | `web/src/pages/LiveCaptions.tsx` (`/live/{stage}`) | Audience view: stage + language, font size, contrast, dark mode, `aria-live` captions, reconnecting socket. |
+| Translation | `lenguaraz/translate/fanout.py` | One ordered worker per (stage, language): every final caption is translated with the stage glossary and the last segments as context (Interactions API, `thinking_level: minimal`); retries with backoff; on persistent failure the caption is published with `degraded: true` and the original text. Progressive translation publishes a provisional line from a debounced partial. |
+| Language demand | `lenguaraz/translate/demand.py` | Active languages = `ALWAYS_ON_LANGS` plus languages with a listener in the last `LANG_GRACE_SECONDS`, restricted to the stage's `targets`; evaluated at every caption. |
+| Transcript export | `lenguaraz/export.py` | Bounded in-memory transcript per stage and language (start = first partial, end = final, on the audio timeline), fed from the bus; `GET /api/admin/stages/{id}/export?format=srt\|vtt\|txt&lang=` renders it. Nothing touches disk until an operator exports. |
+| Admin | `lenguaraz/api/admin.py`, `web/src/pages/Admin.tsx` (`/admin`) | Operator API and dashboard behind `ADMIN_TOKEN` (Bearer, constant-time compare): stage snapshots with latency, rotations, errors, duplicates, dropped chunks, token usage and estimated cost; start/stop; exports. |
+| Overlay | `web/src/pages/Overlay.tsx` | Transparent overlay for OBS/vMix browser sources: `/overlay/{stage}?lang=&lines=2&size=l&align=bottom&bg=band`. |
+| Glossary | `lenguaraz/glossary/` | Manual glossary per stage plus the auto-glossary derived from the talk title and abstract (feature 006). |
 
 ## Stage states
 
@@ -75,7 +75,7 @@ The first message is always a `status` event. Then, one JSON object per message:
 |---|---|
 | `GET /healthz` | `{"status":"ok","engine":"gemini|fake","stages":N,"version":"…"}` |
 | `GET /api/stages` | One row per stage: `id`, `name`, `state`, `detail`, `source_lang`, `targets`, `languages`, `listeners`, `dry_run`, `session_id`, `rotations`, `errors`, `captions_final`, `p50_ms`, `p95_ms`, `interim_p95_ms` |
-| `GET /` , `/fogon/{stage}`, `/pizarron/{stage}`, `/mangrullo` | The single-page app: home, audience view, overlay, operations |
+| `GET /` , `/live/{stage}`, `/overlay/{stage}`, `/admin` | The single-page app: home, live captions, overlay, admin |
 | `GET /api/branding` | Event identity from `branding.yaml` (`event_name`, `tagline`, `primary_color`, `logo_url`, `footer`), defaults when the file is absent; `/branding/*` serves `branding/local/` read-only |
 | `GET /api/admin/stages` (Bearer) | Snapshots plus `running`, `audio_seconds`, `est_cost_usd`, `transcript_entries` |
 | `POST /api/admin/stages/{id}/start` · `/stop` (Bearer) | Start or stop a stage runner |

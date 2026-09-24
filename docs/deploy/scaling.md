@@ -17,7 +17,7 @@ and 1 GB of RAM** — the API quota is the real limit, not the machine.
 ## Adding stages
 
 Add entries to `stages.yaml` and restart (`docker compose up -d --build`, or `Start` in
-Mangrullo after a restart). Nothing else changes: the audience picks the stage on the home
+the Admin page after a restart). Nothing else changes: the audience picks the stage on the home
 page, the overlay URL follows the stage id, exports are per stage.
 
 ## API quota planning

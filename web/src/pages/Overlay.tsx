@@ -10,10 +10,10 @@ import {
 } from '../lib/captions';
 import { deriveShortCode } from '../lib/lang';
 import { useStages } from '../lib/useStages';
-import './pizarron.css';
+import './overlay.css';
 
 /**
- * Pizarrón: a transparent caption overlay for OBS / vMix browser sources.
+ * Overlay: a transparent caption overlay for OBS / vMix browser sources.
  * Query parameters: `lang` (short code), `lines` (1-5), `size` (s|m|l|xl),
  * `align` (bottom|top), `bg` (band|none).
  */
@@ -59,7 +59,7 @@ export function overlayFontSize(size: OverlaySize): string {
   return `min(${px}px, ${vw.toFixed(3)}vw)`;
 }
 
-export function Pizarron() {
+export function Overlay() {
   const { stage: stageId = '' } = useParams();
   const [searchParams] = useSearchParams();
   const { stages } = useStages(5000);
@@ -78,7 +78,7 @@ export function Pizarron() {
   });
 
   useEffect(() => {
-    document.title = stage ? `Pizarrón · ${stage.name} · Lenguaraz` : 'Pizarrón · Lenguaraz';
+    document.title = stage ? `Overlay · ${stage.name}` : 'Overlay · Lenguaraz';
   }, [stage]);
 
   // Transparent page background, no scrollbars, no focus rings: scoped via <html data-overlay>.
@@ -106,9 +106,9 @@ export function Pizarron() {
   const stageMissing = stages !== null && stage === null;
   const errorLine =
     connection.status === 'error'
-      ? `Pizarrón: ${connection.message ?? 'connection failed'} (stage "${stageId}", lang "${lang ?? '?'}")`
+      ? `Overlay: ${connection.message ?? 'connection failed'} (stage "${stageId}", lang "${lang ?? '?'}")`
       : stageMissing
-        ? `Pizarrón: unknown stage "${stageId}"`
+        ? `Overlay: unknown stage "${stageId}"`
         : null;
 
   const visible = captions.finals.slice(-options.lines);

@@ -6,7 +6,7 @@ Responsibilities (spec 001 FR-001-03/05/06/13, spec 003 FR-003-01/02/03/06/07):
 - in hybrid VAD mode, send ``audio_stream_end`` after speech + silence (fast finalization);
 - turn engine events into ``Segment`` objects with a monotonically increasing ``seq`` that
   continues across sessions (all interims of an utterance share the ``seq`` of their final);
-- **Posta, make-before-break rotation:** on the rotation timer or the server's ``GoAway``,
+- **Session rotation, make-before-break:** on the rotation timer or the server's ``GoAway``,
   open the next session while the current one keeps listening, switch the audio feed only
   when it is connected, then let the old session drain its last finals before closing it;
 - drop late duplicates (same normalized text within a short window) and measure the caption

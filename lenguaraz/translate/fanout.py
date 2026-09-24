@@ -1,5 +1,5 @@
 # SPDX-License-Identifier: Apache-2.0
-"""Parla — translate every final caption into each active target language.
+"""Translation — translate every final caption into each active target language.
 
 One ordered worker per (stage, language): finals are translated sequentially per language,
 so captions never arrive out of order. Pass-through is inherent: a listener whose language
@@ -15,6 +15,7 @@ from __future__ import annotations
 import asyncio
 import contextlib
 import logging
+import re
 import time
 from collections import deque
 from collections.abc import Awaitable, Callable
@@ -35,6 +36,11 @@ log = logging.getLogger("lenguaraz.translate")
 
 QUEUE_SIZE = 100
 BACKOFF_SECONDS = (0.5, 1.0, 2.0)
+# 429: pause the language for the server's retry hint instead of hammering (spec 002 FR-002-14)
+COOLDOWN_DEFAULT_SECONDS = 30.0
+COOLDOWN_MIN_SECONDS = 5.0
+COOLDOWN_MAX_SECONDS = 120.0
+RETRY_HINT = re.compile(r"retry in ([0-9.]+)s", re.IGNORECASE)
 StatusCallback = Callable[[str], None]
 SleepFn = Callable[[float], Awaitable[None]]
 
@@ -54,6 +60,8 @@ class _Language:
     usage: TranslationUsage = field(default_factory=TranslationUsage)
     progressive: _Progressive = field(default_factory=_Progressive)
     dropped: int = 0
+    cooldown_until: float = 0.0
+    rate_limited: int = 0
 
 
 class TranslationFanout:
@@ -81,9 +89,9 @@ class TranslationFanout:
             settings.lang_grace_seconds,
             clock=clock,
         )
-        self._log = logging.LoggerAdapter(log, {"stage_id": stage.id, "component": "Parla"})
+        self._log = logging.LoggerAdapter(log, {"stage_id": stage.id, "component": "translation"})
 
-    # -- demand (Baqueano) ---------------------------------------------------------------
+    # -- language demand ---------------------------------------------------------------
 
     def active_languages(self) -> list[str]:
         listening = getattr(self._bus, "languages_with_listeners", None)
@@ -93,6 +101,10 @@ class TranslationFanout:
 
     def usage(self) -> dict[str, dict[str, int]]:
         return {code: lang.usage.as_dict() for code, lang in self._languages.items()}
+
+    def rate_limited(self) -> int:
+        """How many times a 429 paused a language (all languages)."""
+        return sum(lang.rate_limited for lang in self._languages.values())
 
     # -- entry point -----------------------------------------------------------------------
 
@@ -132,7 +144,7 @@ class TranslationFanout:
             lang.context = deque(maxlen=max(0, self._settings.translate_context_segments))
             self._languages[code] = lang
         if lang.worker is None or lang.worker.done():
-            lang.worker = asyncio.create_task(self._worker(code, lang), name=f"parla-{code}")
+            lang.worker = asyncio.create_task(self._worker(code, lang), name=f"translate-{code}")
         return lang
 
     def _enqueue(self, code: str, event: CaptionEvent) -> None:
@@ -153,6 +165,8 @@ class TranslationFanout:
     def _maybe_progressive(self, code: str, event: CaptionEvent) -> None:
         lang = self._language(code)
         state = lang.progressive
+        if self._clock() < lang.cooldown_until:
+            return  # rate limited: partials are not worth a request
         if len(event.text.split()) < self._settings.progressive_min_words:
             return
         if event.text == state.last_text:
@@ -166,7 +180,7 @@ class TranslationFanout:
         state.last_time = now
         state.task = asyncio.create_task(
             self._translate_and_publish(code, lang, event, is_final=False),
-            name=f"parla-progressive-{code}",
+            name=f"translate-progressive-{code}",
         )
 
     # -- one translation ---------------------------------------------------------------------
@@ -184,11 +198,22 @@ class TranslationFanout:
             talk_abstract=self._stage.talk.abstract,
         )
         started = self._clock()
+        if started < lang.cooldown_until:
+            self._publish(
+                code, event, event.text, is_final=is_final, started=started, degraded=True
+            )
+            return
         last_error: Exception | None = None
         for attempt, delay in enumerate((*BACKOFF_SECONDS, None), start=1):
             try:
                 outcome = await self._engine.translate(request)
             except TranslationError as exc:
+                if exc.code == 429:
+                    self._rate_limited(code, lang, exc)
+                    self._publish(
+                        code, event, event.text, is_final=is_final, started=started, degraded=True
+                    )
+                    return
                 last_error = exc
                 if not exc.retryable or delay is None:
                     break
@@ -210,7 +235,21 @@ class TranslationFanout:
         self._log.error(detail)
         if self._on_status is not None:
             self._on_status(detail)
-        self._publish(code, event, "", is_final=is_final, started=started, degraded=True)
+        self._publish(code, event, event.text, is_final=is_final, started=started, degraded=True)
+
+    def _rate_limited(self, code: str, lang: _Language, exc: TranslationError) -> None:
+        match = RETRY_HINT.search(str(exc))
+        seconds = float(match.group(1)) if match else COOLDOWN_DEFAULT_SECONDS
+        seconds = min(max(seconds, COOLDOWN_MIN_SECONDS), COOLDOWN_MAX_SECONDS)
+        lang.cooldown_until = self._clock() + seconds
+        lang.rate_limited += 1
+        detail = (
+            f"rate limited (429): translation to {code} paused for {seconds:.0f}s; "
+            "captions show the original text"
+        )
+        self._log.warning(detail)
+        if self._on_status is not None:
+            self._on_status(detail)
 
     def _publish(
         self,

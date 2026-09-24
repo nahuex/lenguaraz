@@ -1,5 +1,5 @@
 # SPDX-License-Identifier: Apache-2.0
-"""Acta — the written record of the parley: transcript store and SRT/VTT/TXT renderers.
+"""Transcript export — transcript store and SRT/VTT/TXT renderers.
 
 The store keeps final captions per language with their position on the audio timeline
 (``start_ms`` = first partial of the utterance, ``end_ms`` = its final). It lives in memory,

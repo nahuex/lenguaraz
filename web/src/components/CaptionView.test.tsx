@@ -51,4 +51,12 @@ describe('CaptionView', () => {
     expect(screen.getByText('hello')).toBeInTheDocument();
     expect(screen.getAllByText('same')).toHaveLength(1);
   });
+
+  it('marks a degraded caption (original text shown) without a duplicate original line', () => {
+    const degraded = { ...caption(1, 'Hello everyone.', 'Hello everyone.'), degraded: true };
+    render(<CaptionView finals={[degraded]} interim={null} lines={3} showOriginal={true} />);
+    expect(screen.getByText('Hello everyone.')).toBeInTheDocument();
+    expect(screen.getByText('original')).toHaveAttribute('title');
+    expect(screen.getAllByText('Hello everyone.')).toHaveLength(1);
+  });
 });

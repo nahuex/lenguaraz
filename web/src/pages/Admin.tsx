@@ -17,7 +17,7 @@ import {
 import { deriveShortCode, languageLabel } from '../lib/lang';
 
 /**
- * Mangrullo: the operations panel. Bearer-authenticated view of every stage
+ * Admin: the operator dashboard. Bearer-authenticated view of every stage
  * with start/stop, transcript export and the live metrics, polled every 3 s.
  * The admin token lives in sessionStorage only (never in the URL).
  */
@@ -78,7 +78,7 @@ export function formatCost(usd: number): string {
 }
 
 function overlayPath(stage: AdminStage): string {
-  const base = `/pizarron/${encodeURIComponent(stage.id)}`;
+  const base = `/overlay/${encodeURIComponent(stage.id)}`;
   const source = stage.source_lang[0];
   return source ? `${base}?lang=${encodeURIComponent(deriveShortCode(source))}` : base;
 }
@@ -204,7 +204,7 @@ const BUTTON =
 const BUTTON_PRIMARY = `${BUTTON} border-accent bg-accent text-accent-ink hover:opacity-90`;
 const BUTTON_PLAIN = `${BUTTON} border-line bg-surface-raised text-ink hover:border-accent`;
 
-export function Mangrullo() {
+export function Admin() {
   const [token, setToken] = useState<string | null>(() => readToken());
   const [draft, setDraft] = useState('');
   const [authError, setAuthError] = useState<string | null>(null);
@@ -216,7 +216,7 @@ export function Mangrullo() {
   const tokenInputId = useId();
 
   useEffect(() => {
-    document.title = 'Mangrullo · operations · Lenguaraz';
+    document.title = 'Admin · Lenguaraz';
   }, []);
 
   useEffect(() => {
@@ -313,7 +313,8 @@ export function Mangrullo() {
       </nav>
 
       <header className="flex flex-col gap-2">
-        <h1 className="text-2xl font-bold tracking-tight">Mangrullo · operations</h1>
+        <h1 className="text-2xl font-bold tracking-tight">Admin</h1>
+        <p className="text-ink-muted">Operator dashboard</p>
         <p className="text-sm text-ink-muted">
           {health !== null
             ? `Backend: engine ${health.engine} · ${health.stages} ${
@@ -519,11 +520,11 @@ export function Mangrullo() {
                           </span>
                           <span className="mt-1 flex flex-wrap gap-3 text-xs">
                             <Link
-                              to={`/fogon/${encodeURIComponent(stage.id)}`}
-                              aria-label={`Fogón for ${stage.name}`}
+                              to={`/live/${encodeURIComponent(stage.id)}`}
+                              aria-label={`Live captions for ${stage.name}`}
                               className="text-accent underline"
                             >
-                              Fogón
+                              Live captions
                             </Link>
                             <Link
                               to={overlayPath(stage)}

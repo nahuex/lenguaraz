@@ -39,7 +39,7 @@ const CONNECTION_DOT: Record<ConnectionState['status'], string> = {
   error: 'bg-[#f97316]',
 };
 
-export function Fogon() {
+export function LiveCaptions() {
   const { stage: stageId = '' } = useParams();
   const [searchParams, setSearchParams] = useSearchParams();
   const prefs = usePrefs();
@@ -60,7 +60,7 @@ export function Fogon() {
   });
 
   useEffect(() => {
-    document.title = stage ? `Fogón · ${stage.name} · Lenguaraz` : 'Fogón · Lenguaraz';
+    document.title = stage ? `Live captions · ${stage.name} · Lenguaraz` : 'Live captions · Lenguaraz';
   }, [stage]);
 
   useEffect(() => {
@@ -98,7 +98,7 @@ export function Fogon() {
           </div>
         )}
         <h1 className="text-2xl font-bold tracking-tight">
-          Fogón · live captions — {stage?.name ?? stageId}
+          {stage?.name ?? stageId}
         </h1>
         <p role="status" className="flex items-center gap-2 text-sm text-ink-muted">
           <span

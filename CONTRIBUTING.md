@@ -91,26 +91,25 @@ the code: a new setting goes into `docs/configuration.md` (its env table is comp
 mode into `docs/troubleshooting.md` or the runbook. Docs are event-agnostic: no conference
 name, stage, language or brand as a default.
 
-## Naming
+## Components
 
-Surface names come from the lenguaraz's world and appear in the UI, routes, metrics and docs;
-modules keep plain technical names so the code reads instantly.
+The product is called Lenguaraz; every component carries the standard name used by
+live-captioning platforms, in the UI, the routes, the docs and the code.
 
-| Surface | Code | Role |
+| Component | Code | Role |
 |---|---|---|
-| Oído | `ingest/` | Audio in (ffmpeg / WAV reader) |
-| Lengua | `stt/` | Live transcription |
-| Posta | `stt/session.py` | Make-before-break session rotation |
-| Parla | `translate/` | Translation fan-out |
-| Baqueano | `translate/demand.py` | Which languages are active |
-| Chasque | `bus/` | Event bus and audience fan-out |
-| Diccionario | `glossary/` | Glossary and auto-glossary |
-| Acta | `export.py` | SRT/VTT/TXT export |
-| Fogón | `web/src/pages/Fogon.tsx`, route `/fogon/{stage}` | Audience view |
-| Pizarrón | `web/src/pages/Pizarron.tsx`, route `/pizarron/{stage}` | OBS/vMix overlay |
-| Mangrullo | `web/src/pages/Mangrullo.tsx`, `api/admin.py`, route `/mangrullo` | Operations panel |
+| Audio ingest | `lenguaraz/ingest/` | Audio in (ffmpeg / WAV reader) |
+| Transcription | `lenguaraz/stt/` | Live transcription; `stt/session.py` owns the make-before-break session rotation |
+| Translation | `lenguaraz/translate/` | Translation fan-out; `translate/demand.py` decides which languages are active (language demand) |
+| Event bus | `lenguaraz/bus/` | Fan-out to the audience |
+| Glossary | `lenguaraz/glossary/` | Glossary and auto-glossary |
+| Transcript export | `lenguaraz/export.py` | SRT/VTT/TXT export |
+| Live captions page | `web/src/pages/LiveCaptions.tsx`, route `/live/{stage}` | Audience view |
+| Overlay | `web/src/pages/Overlay.tsx`, route `/overlay/{stage}` | OBS/vMix browser source |
+| Admin | `web/src/pages/Admin.tsx`, `lenguaraz/api/admin.py`, route `/admin` | Operator dashboard |
 
-Routes and identifiers are ASCII (`fogon`, `pizarron`); display text may carry accents.
+Routes are `/live/{stage}`, `/overlay/{stage}` and `/admin`; the caption WebSocket is
+`/ws/{stage}` and the JSON API lives under `/api/`. Stage ids are ASCII.
 
 ## Proposing changes
 

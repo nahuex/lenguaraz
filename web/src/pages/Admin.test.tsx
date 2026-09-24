@@ -2,7 +2,7 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { fireEvent, render, screen, waitFor, within } from '@testing-library/react';
 import { MemoryRouter } from 'react-router-dom';
-import { ADMIN_TOKEN_KEY, Mangrullo, formatCost, sumTokens } from './Mangrullo';
+import { ADMIN_TOKEN_KEY, Admin, formatCost, sumTokens } from './Admin';
 import type { AdminStage, Health } from '../lib/api';
 
 const HEALTH: Health = { status: 'ok', engine: 'fake', stages: 2, version: '0.1.0' };
@@ -82,8 +82,8 @@ function stubFetch(adminStatus: 200 | 401): FetchMock {
 
 function renderPage() {
   return render(
-    <MemoryRouter initialEntries={['/mangrullo']}>
-      <Mangrullo />
+    <MemoryRouter initialEntries={['/admin']}>
+      <Admin />
     </MemoryRouter>,
   );
 }
@@ -106,7 +106,7 @@ describe('helpers', () => {
   });
 });
 
-describe('Mangrullo', () => {
+describe('Admin', () => {
   beforeEach(() => {
     window.sessionStorage.clear();
   });
@@ -119,7 +119,7 @@ describe('Mangrullo', () => {
     stubFetch(200);
     renderPage();
 
-    expect(screen.getByRole('heading', { name: 'Mangrullo · operations' })).toBeInTheDocument();
+    expect(screen.getByRole('heading', { name: 'Admin' })).toBeInTheDocument();
     expect(screen.getByLabelText('Admin token')).toHaveAttribute('type', 'password');
     expect(screen.getByRole('button', { name: 'Connect' })).toBeInTheDocument();
     expect(screen.queryByRole('table')).toBeNull();
@@ -187,13 +187,13 @@ describe('Mangrullo', () => {
     });
 
     // Links to the viewer and the overlay for each stage.
-    expect(screen.getByRole('link', { name: 'Fogón for Main Stage' })).toHaveAttribute(
+    expect(screen.getByRole('link', { name: 'Live captions for Main Stage' })).toHaveAttribute(
       'href',
-      '/fogon/main',
+      '/live/main',
     );
     expect(screen.getByRole('link', { name: 'Overlay for Main Stage' })).toHaveAttribute(
       'href',
-      '/pizarron/main?lang=en',
+      '/overlay/main?lang=en',
     );
   });
 });

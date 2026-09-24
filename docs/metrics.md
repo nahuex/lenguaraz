@@ -57,7 +57,7 @@ Measured by the project's own tooling (Constitution Art. V.2); definitions below
   errors are punctuation/number formatting). On the English sample the model already spells
   `eBPF`, `Cilium`, `CoreDNS` and `OpenTelemetry` correctly without help (WER 3.2 % in the
   clean run with and without the glossary), so the glossary matters most for names the model
-  has never seen. `--glossary auto` asked Diccionario (Gemini structured output) for terms from
+  has never seen. `--glossary auto` asked the auto-glossary (Gemini structured output) for terms from
   the talk title/abstract: +0 for the English stage (every term was already in the manual
   list) and +2 for the Spanish stage (`Python`, `Gemini Live`), with no WER change.
 - **Two anomalous no-glossary rows (21:52 and 21:54)** are server-side variance, not the

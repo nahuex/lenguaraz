@@ -1,5 +1,5 @@
 # SPDX-License-Identifier: Apache-2.0
-"""Mangrullo — operator API behind ``ADMIN_TOKEN`` (Bearer). Constitution Art. VIII.2."""
+"""Admin — operator API behind ``ADMIN_TOKEN`` (Bearer). Constitution Art. VIII.2."""
 
 from __future__ import annotations
 
@@ -12,7 +12,7 @@ from fastapi.responses import PlainTextResponse
 from lenguaraz.export import FORMATS
 from lenguaraz.runner import StageManager, StageRunner
 
-router = APIRouter(prefix="/api/admin", tags=["mangrullo"])
+router = APIRouter(prefix="/api/admin", tags=["admin"])
 
 MEDIA_TYPES = {"srt": "application/x-subrip", "vtt": "text/vtt", "txt": "text/plain"}
 

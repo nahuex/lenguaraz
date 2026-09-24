@@ -1,22 +1,22 @@
 // SPDX-License-Identifier: Apache-2.0
 import { createBrowserRouter } from 'react-router-dom';
 import { Layout } from './components/Layout';
-import { Fogon } from './pages/Fogon';
+import { Admin } from './pages/Admin';
 import { Home } from './pages/Home';
-import { Mangrullo } from './pages/Mangrullo';
+import { LiveCaptions } from './pages/LiveCaptions';
 import { NotFound } from './pages/NotFound';
-import { Pizarron } from './pages/Pizarron';
+import { Overlay } from './pages/Overlay';
 
 export const router = createBrowserRouter([
-  // Pizarrón renders without the page shell: transparent overlay for OBS / vMix.
-  { path: '/pizarron/:stage', element: <Pizarron /> },
+  // The overlay renders without the page shell: transparent browser source for OBS / vMix.
+  { path: '/overlay/:stage', element: <Overlay /> },
   {
     path: '/',
     element: <Layout />,
     children: [
       { index: true, element: <Home /> },
-      { path: 'fogon/:stage', element: <Fogon /> },
-      { path: 'mangrullo', element: <Mangrullo /> },
+      { path: 'live/:stage', element: <LiveCaptions /> },
+      { path: 'admin', element: <Admin /> },
       { path: '*', element: <NotFound /> },
     ],
   },

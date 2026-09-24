@@ -311,7 +311,7 @@ def append_metrics_row(
 async def apply_glossary_option(
     stage: StageConfig, option: str, settings: Settings
 ) -> tuple[StageConfig, str]:
-    """none → empty list; manual → stages.yaml list; auto → manual + Diccionario suggestions."""
+    """none → empty list; manual → stages.yaml list; auto → manual + auto-glossary suggestions."""
     if option == "none":
         return stage.model_copy(update={"glossary": []}), "none"
     if option == "auto":

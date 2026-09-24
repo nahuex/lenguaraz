@@ -1,5 +1,5 @@
 # SPDX-License-Identifier: Apache-2.0
-"""Bus interface (Chasque). In-memory by default; a Redis implementation can plug in later."""
+"""Bus interface (event bus). In-memory by default; a Redis implementation can plug in later."""
 
 from __future__ import annotations
 

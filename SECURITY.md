@@ -22,9 +22,9 @@ you prefer otherwise.
   It never reaches a browser, a log line, a commit or a test fixture. Audience pages talk to
   Lenguaraz only over WebSocket; the browser never talks to Google.
 - **Operator actions need a Bearer token** (`ADMIN_TOKEN`, compared in constant time). Without
-  it the admin API (`/api/admin/*`) and the Mangrullo panel refuse every request.
+  it the admin API (`/api/admin/*`) and the Admin page refuse every request.
 - **Audio is never stored.** PCM frames flow from ffmpeg to the transcription session and are
-  discarded; only text captions are kept in memory for the transcript export (Acta) and are
+  discarded; only text captions are kept in memory for the transcript export and are
   gone when the process stops.
 - **Prompt injection through the microphone** is a real vector: whatever a speaker says is
   transcribed and then translated. Transcripts, glossary terms and talk metadata enter the

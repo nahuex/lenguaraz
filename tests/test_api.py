@@ -81,7 +81,7 @@ def test_api_stages_lists_every_stage_with_state(client: TestClient) -> None:
 
 def test_spa_fallback_and_assets(client: TestClient) -> None:
     assert client.get("/").text.startswith("<!doctype html>")
-    assert client.get("/fogon/main").text.startswith("<!doctype html>")
+    assert client.get("/live/main").text.startswith("<!doctype html>")
     assert client.get("/assets/app.js").text == "console.log('ok')"
     assert client.get("/api/nope").status_code == 404
     assert client.get("/../pyproject.toml").status_code in (200, 404)  # never escapes dist

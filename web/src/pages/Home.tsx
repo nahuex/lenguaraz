@@ -46,8 +46,8 @@ export function Home() {
       )}
 
       <p className="text-sm text-ink-muted">
-        <Link to="/mangrullo" className="underline hover:text-ink">
-          Operations (Mangrullo)
+        <Link to="/admin" className="underline hover:text-ink">
+          Admin · operator dashboard
         </Link>
       </p>
     </div>

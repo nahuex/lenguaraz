@@ -1,7 +1,7 @@
 /* SPDX-License-Identifier: Apache-2.0 */
 
 /*
- * Pizarrón: OBS / vMix browser-source overlay. Everything here is scoped to
+ * Overlay: the OBS / vMix browser-source caption overlay. Everything here is scoped to
  * <html data-overlay="true">, set by the page while it is mounted, so the
  * transparent background never leaks into the other routes. These rules are
  * intentionally outside any cascade layer so they beat the themed base styles.

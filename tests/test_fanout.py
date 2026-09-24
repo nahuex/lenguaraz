@@ -144,7 +144,7 @@ async def test_transient_errors_retry_then_succeed(bus: MemoryBus) -> None:
 
 async def test_persistent_failure_publishes_degraded_caption_and_status(bus: MemoryBus) -> None:
     details: list[str] = []
-    translator = FakeTranslator(failures=[TranslationError("quota", code=429)] * 5)
+    translator = FakeTranslator(failures=[TranslationError("upstream", code=503)] * 5)
     fanout = TranslationFanout(
         STAGE, translator, bus, settings(), sleep=fast_sleep, on_status=details.append
     )
@@ -152,8 +152,9 @@ async def test_persistent_failure_publishes_degraded_caption_and_status(bus: Mem
     fanout.on_caption(caption(1, "No luck."))
     events = await drain(es, 0.3)
     assert len(events) == 1
-    assert events[0].degraded is True and events[0].text == "" and events[0].original == "No luck."
-    assert details and "translation to es failed" in details[0] and "quota" in details[0]
+    assert events[0].degraded is True and events[0].text == "No luck."
+    assert events[0].original == "No luck."  # degraded = the original text, never silence
+    assert details and "translation to es failed" in details[0] and "upstream" in details[0]
     assert len(translator.requests) == 4  # 1 + 3 retries
     await fanout.stop()
 
@@ -165,4 +166,44 @@ async def test_non_retryable_error_degrades_immediately(bus: MemoryBus) -> None:
     fanout.on_caption(caption(1, "Bad request."))
     events = await drain(es, 0.2)
     assert events[0].degraded is True and len(translator.requests) == 1
+    await fanout.stop()
+
+
+async def test_rate_limit_pauses_translation_and_shows_the_original(bus: MemoryBus) -> None:
+    """Spec 002 FR-002-14: a 429 pauses the language for the server's hint; no hammering."""
+    now = [1000.0]
+    details: list[str] = []
+    translator = FakeTranslator(
+        failures=[
+            TranslationError("quota exhausted (429): limit 15. Please retry in 40.5s.", code=429)
+        ]
+    )
+    fanout = TranslationFanout(
+        STAGE,
+        translator,
+        bus,
+        settings(),
+        sleep=fast_sleep,
+        clock=lambda: now[0],
+        on_status=details.append,
+    )
+    es = bus.subscribe("main", lang="es")
+    fanout.on_caption(caption(1, "First."))
+    events = await drain(es, 0.2)
+    assert [(e.text, e.degraded) for e in events] == [("First.", True)]
+    assert len(translator.requests) == 1  # no retries on 429
+    assert details and "rate limited (429)" in details[0] and "40s" in details[0]
+
+    fanout.on_caption(caption(2, "A partial sentence with enough words to translate", final=False))
+    fanout.on_caption(caption(3, "Third."))
+    events = await drain(es, 0.2)
+    assert [(e.text, e.degraded) for e in events] == [("Third.", True)]  # partial skipped
+    assert len(translator.requests) == 1  # nothing sent while paused
+    assert fanout.rate_limited() == 1
+
+    now[0] += 41.0
+    fanout.on_caption(caption(4, "Fourth."))
+    events = await drain(es, 0.2)
+    assert [(e.text, e.degraded) for e in events] == [("[es] Fourth.", False)]
+    assert len(translator.requests) == 2
     await fanout.stop()

@@ -30,14 +30,15 @@ who travelled with the expeditions across the Pampas.
 - Translates the finals (and, progressively, long partials) into any number of target
   languages with `gemini-3.5-flash-lite`, glossary-aware and with context, only for the
   languages someone is actually listening to.
-- Serves the audience view (**Fogón**: stage and language picker, font size, high contrast,
-  dark mode, screen-reader friendly), an OBS overlay (**Pizarrón**) and an operator panel
-  (**Mangrullo**: state, latency percentiles, rotations, cost, start/stop, SRT/VTT/TXT export).
+- Serves the audience view (**Live captions**: stage and language picker, font size, high
+  contrast, dark mode, screen-reader friendly), an OBS/vMix browser source (**Overlay**) and an
+  operator dashboard (**Admin**: state, latency percentiles, rotations, cost, start/stop,
+  SRT/VTT/TXT export).
 - Survives the 10-minute Live session limit with make-before-break rotation at a pause (0 lost,
   0 duplicated sentences measured), reconnects with backoff, degrades to source text when
   translation fails, and reopens a session that goes silent while speech keeps flowing.
 - Builds a first glossary automatically from the talk title and abstract with Gemini
-  structured output (**Diccionario**), merged after the operator's manual list.
+  structured output (**auto-glossary**), merged after the operator's manual list.
 - Runs many stages in one process (10 stages ≈ 10 % of one core), any audio ffmpeg can read
   (SRT, RTMP, HLS, files), non-root read-only container, and a credential-free dry-run mode.
 

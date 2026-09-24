@@ -1,6 +1,6 @@
 # Lenguaraz Constitution
 
-**Version:** 1.0.0 · **Ratified:** 2026-09-24 (at kickoff, by the human owner) · **Scope:** every spec, plan, task, commit and document in this repository.
+**Version:** 1.0.1 · **Ratified:** 2026-09-24 (at kickoff, by the human owner) · **Scope:** every spec, plan, task, commit and document in this repository.
 
 This constitution is the highest authority in the repo. When a spec, plan, task, prompt or instruction conflicts with it, the constitution wins. Articles marked **[NN]** are non-negotiable: they cannot be traded for speed, scope or convenience. Amendments follow Article XVIII.
 
@@ -17,23 +17,23 @@ Built for the Nerdearla Vibeathon 2026. Judged on: **Quality, Latency, Scalabili
 On the 18th–19th century Río de la Plata frontier, the *lenguaraz* was the interpreter who stood between peoples who did not share a language, so that everyone in a parley could follow what was said. That is exactly this system's job: someone speaks on a stage, and every person understands it in their own language. The name and its story appear in the README (EN and ES) and in the demo video. Pronunciation note for the README: *len-gwa-RAHS*.
 
 ### Naming convention (applies to the whole repo)
-Components carry names from the lenguaraz's world **on the surface** — UI pages and routes, CLI subcommands, Docker service labels, metric/log component fields, docs headings. **Inside the code**, modules keep descriptive technical names so any contributor understands them instantly. The README includes this glossary table verbatim.
+Components carry **standard English names used by live-captioning platforms** on every surface — UI labels and page titles, routes, CLI subcommands, Docker service labels, metric/log component fields, docs headings — so that an operator, an audience member or a judge understands each one without explanation. The only Rioplatense word in the product is the product name **Lenguaraz** (owner decision N1, 2026-09-24T22:45Z); its story stays in one paragraph of the README and no component carries an etymology. **Inside the code**, modules keep descriptive technical names so any contributor understands them instantly. The README includes this table as its "Components" section.
 
 | Surface name | Component | Code module | Meaning |
 |---|---|---|---|
-| **Oído** (`oido`) | Audio ingest (ffmpeg / browser) | `ingest/` | "The ear" — listens to the stage |
-| **Lengua** (`lengua`) | Live transcription | `stt/` | "Tongue / language" — turns voice into words |
-| **Parla** (`parla`) | Text translation fan-out | `translate/` | Rioplatense for "the gift of speech" — says it in every language |
-| **Posta** (`posta`) | Make-before-break session rotation | `stt/rotation.py` | Relay stations where messengers changed horses without stopping the message |
-| **Baqueano** (`baqueano`) | Language-demand reconciler (D8) | `translate/demand.py` | The guide who knows which paths to open and which to close |
-| **Chasque** (`chasque`) | Event bus and audience fan-out | `bus/` | The messenger who carries the word to everyone |
-| **Fogón** (`/fogon/{stage}`) | Audience view | `web/src/pages/Fogon.tsx` | The campfire where people gather to listen |
-| **Mangrullo** (`/mangrullo`) | Production monitoring & admin | `web/src/pages/Mangrullo.tsx`, `api/admin.py` | The frontier watchtower — sees everything |
-| **Pizarrón** (`/pizarron/{stage}`) | OBS/vMix overlay | `web/src/pages/Pizarron.tsx` | The general store's chalkboard, visible to all |
-| **Diccionario** (`diccionario`) | Glossary + auto-glossary | `glossary/` | The lenguaraz's knowledge |
-| **Acta** (`acta`) | SRT/VTT/TXT export | `export.py` | The written record of the parley |
+| **Ingest** (`ingest`) | Audio ingest (ffmpeg / browser) | `ingest/` | ffmpeg or WAV reader → 16 kHz mono PCM chunks |
+| **Transcription** (`transcription`) | Live transcription | `stt/` | Gemini Live API session: partial and final captions, hybrid VAD, stall watchdog |
+| **Translation** (`translation`) | Text translation fan-out | `translate/` | Per-language workers, glossary-aware prompts, pass-through when source == target |
+| **Session rotation** (`session_rotation`) | Make-before-break session rotation | `stt/session.py` | Opens the next Live session before the current one expires; zero lost finals |
+| **Language demand** (`language_demand`) | Language-demand reconciler (D8) | `translate/demand.py` | Translates only into languages with listeners (plus `always_on`) |
+| **Event bus** (`event_bus`) | Event bus and audience fan-out | `bus/` | Bounded fan-out to WebSocket clients; interims may be dropped, finals never |
+| **Live captions** (`/live/{stage}`) | Audience view | `web/src/pages/LiveCaptions.tsx` | Stage, language, font size, contrast, dark mode |
+| **Admin** (`/admin`) | Operator dashboard | `web/src/pages/Admin.tsx`, `api/admin.py` | States, latency, cost, start/stop, exports; behind `ADMIN_TOKEN` |
+| **Overlay** (`/overlay/{stage}`) | OBS/vMix overlay | `web/src/pages/Overlay.tsx` | Transparent browser source for OBS/vMix (`?lang=&lines=`) |
+| **Glossary** (`glossary`) | Glossary + auto-glossary | `glossary/` | Manual list + auto-glossary from the talk title/abstract (structured output) |
+| **Transcript export** (`export`) | SRT/VTT/TXT export | `export.py` | In-memory transcript per stage/language, exported as SRT/VTT/TXT |
 
-Rules: routes and identifiers are ASCII lowercase (`fogon`, `pizarron`); display text may use accents (Fogón, Pizarrón). The home page lists stages and links each one's Fogón and QR. Metrics use the prefix `lenguaraz_` and a `component` label with the surface name. English UI strings show the surface name followed by a short descriptor the first time (e.g., "Fogón · live captions").
+Rules: routes and identifiers are ASCII lowercase (`live`, `overlay`, `admin`); the WebSocket path `/ws/{stage}` and every `/api/*` path are unchanged. The home page lists stages and links each one's live captions page ("Open live captions"), overlay ("Overlay for OBS") and QR. Metrics use the prefix `lenguaraz_`; metric and log `component` fields carry the lowercase identifier from the table (`ingest`, `transcription`, `translation`, `session_rotation`, `language_demand`, `event_bus`, `glossary`, `export`). Page titles follow `Live captions · <stage name> · Lenguaraz`, `Overlay · <stage name>` and `Admin · Lenguaraz`; the Admin page heading is "Admin" with the subtitle "Operator dashboard"; the live captions page heading is the stage name. Spanish copy lives only in `README.es.md` and `docs/es/`.
 
 ---
 
@@ -218,3 +218,4 @@ The challenge requires the solution to be under an OSI-approved license **and** 
 
 ### Changelog
 - 1.0.0 — Initial ratification at kickoff. Includes Article XVII (OSI license & universal deployability).
+- 1.0.1 — 2026-09-24T22:45Z: naming convention amended by the owner (N1): standard English surface names; product name unchanged.

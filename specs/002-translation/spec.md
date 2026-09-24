@@ -27,6 +27,7 @@ The lenguaraz's job is that everyone understands in their own language. This fea
 | FR-002-09 | **Usage accounting:** every engine call MUST record `usage_metadata` tokens (input, output, thinking) per stage and language; totals MUST be exposed in the `metrics` event and logged, as the source for `docs/cost.md`. | Art. VII.3 |
 | FR-002-10 | **Docs-as-you-go:** `docs/configuration.md` (new env vars), `docs/architecture.md` (fan-out and demand loop), `docs/customization.md` (languages, glossary), `docs/troubleshooting.md` (wrong language detected, glossary term still mistranslated, translation quota) MUST be updated in this feature. | Art. XVII.D.6 |
 | FR-002-11 | `make smoke-translate` MUST translate five sample segments with a glossary through the real API and print translations, p50/p95 latency and token counts; `make mvp-check` MUST verify MVP-1..7 end to end in fake mode and, when a key is present, in real mode. | Art. I.5 · Art. XII |
+| FR-002-14 | On HTTP 429 the fan-out MUST NOT retry: it pauses that language for the server's retry hint (5–120 s, default 30 s), publishes the caption with the **original text** and `degraded=true`, skips progressive partials while paused, reports the pause in the stage detail and counts it (`translation_rate_limited`). Degraded captions always carry the original text, never an empty line. | Free tier: 15 requests/min (measured 2026-09-24) |
 
 ## 4. Non-functional requirements
 | ID | Requirement | Measure |
@@ -63,3 +64,4 @@ The lenguaraz's job is that everyone understands in their own language. This fea
 
 ## Changelog
 - 2026-09-24T16:02Z created; Q1–Q4 resolved with defaults per CLAUDE.md §5 (logged in HUMAN_INBOX.md); Status Approved.
+- 2026-09-24T23:05Z FR-002-14 added: rate-limit cooldown and original text in degraded captions (the live demo on a free-tier project degraded ~30 % of translations to empty lines).

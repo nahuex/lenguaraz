@@ -1,5 +1,5 @@
 # SPDX-License-Identifier: Apache-2.0
-"""Gemini Live API transcription engine (Lengua).
+"""Gemini Live API transcription engine.
 
 Every field below was verified through the Gemini Docs MCP and against the installed
 ``google-genai`` SDK (plan 001 §2):
@@ -170,6 +170,10 @@ class GeminiSttEngine:
             raise ConnectionError(event.error) from exc
         log.info(
             "live session opened",
-            extra={"stage_id": stage.id, "session_id": session.session_id, "component": "Lengua"},
+            extra={
+                "stage_id": stage.id,
+                "session_id": session.session_id,
+                "component": "transcription",
+            },
         )
         return session

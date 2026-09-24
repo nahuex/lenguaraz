@@ -2,7 +2,7 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { act, render, screen, within } from '@testing-library/react';
 import { MemoryRouter, Route, Routes } from 'react-router-dom';
-import { Pizarron, overlayFontSize, parseOverlayOptions } from './Pizarron';
+import { Overlay, overlayFontSize, parseOverlayOptions } from './Overlay';
 import type { Stage } from '../lib/api';
 import type { CaptionEvent, WebSocketLike } from '../lib/captions';
 
@@ -74,7 +74,7 @@ function renderOverlay(path: string) {
   return render(
     <MemoryRouter initialEntries={[path]}>
       <Routes>
-        <Route path="/pizarron/:stage" element={<Pizarron />} />
+        <Route path="/overlay/:stage" element={<Overlay />} />
       </Routes>
     </MemoryRouter>,
   );
@@ -103,7 +103,7 @@ describe('parseOverlayOptions', () => {
   });
 });
 
-describe('Pizarron', () => {
+describe('Overlay', () => {
   beforeEach(() => {
     FakeSocket.instances = [];
     vi.stubGlobal('WebSocket', FakeSocket);
@@ -118,7 +118,7 @@ describe('Pizarron', () => {
   });
 
   it('shows only the last 2 finals plus the interim line, transparent and without chrome', async () => {
-    renderOverlay('/pizarron/main?lines=2&lang=es');
+    renderOverlay('/overlay/main?lines=2&lang=es');
 
     expect(document.documentElement.dataset.overlay).toBe('true');
     const socket = FakeSocket.instances[0];
@@ -152,7 +152,7 @@ describe('Pizarron', () => {
   });
 
   it('shows a one-line error on a fatal close code', () => {
-    renderOverlay('/pizarron/ghost?lang=es');
+    renderOverlay('/overlay/ghost?lang=es');
     act(() => {
       FakeSocket.instances[0]?.serverClose(4404, 'no such stage');
     });
@@ -162,7 +162,7 @@ describe('Pizarron', () => {
   });
 
   it('cleans the overlay attribute up on unmount', () => {
-    const { unmount } = renderOverlay('/pizarron/main?lang=es');
+    const { unmount } = renderOverlay('/overlay/main?lang=es');
     expect(document.documentElement.dataset.overlay).toBe('true');
     unmount();
     expect(document.documentElement.dataset.overlay).toBeUndefined();

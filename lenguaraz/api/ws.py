@@ -75,7 +75,7 @@ async def caption_socket(
         return
 
     sub: Subscription = manager.bus.subscribe(stage_id, channel)
-    extra = {"stage_id": stage_id, "component": "Chasque", "lang": channel}
+    extra = {"stage_id": stage_id, "component": "event-bus", "lang": channel}
     log.info("listener connected from %s", ip, extra=extra)
     try:
         await websocket.send_text(

@@ -19,7 +19,7 @@ understands it in their own language.
 > **Status:** built during the Nerdearla Vibeathon 2026 window (2026-09-24 15:00 UTC →
 > 2026-09-25 15:00 UTC). Features land in order; this README says what works today.
 
-<!-- screenshot: docs/img/fogon.png — captured by the owner at H4 (Fogón with two languages) -->
+<!-- screenshot: docs/img/live-captions.png — captured by the owner at H4 (live captions page with two languages) -->
 
 ## What it does today
 
@@ -28,21 +28,21 @@ understands it in their own language.
   while the speaker talks, a committed line at every pause, per-stage glossary biasing.
 - **Many stages at once**, each in its own isolated pipeline with a visible state
   (`IDLE · STARTING · LIVE · ROTATING · DEGRADED · STOPPED`) and automatic reconnection.
-- **Audience view (Fogón):** stage and language picker, font size, high contrast, dark mode,
-  screen-reader friendly captions, reconnecting WebSocket.
-- **Live translation (Parla)** into any number of target languages with `gemini-3.5-flash-lite`:
+- **Live captions page (audience view):** stage and language picker, font size, high contrast,
+  dark mode, screen-reader friendly captions, reconnecting WebSocket.
+- **Live translation** into any number of target languages with `gemini-3.5-flash-lite`:
   streamed, glossary-aware, with the previous sentences as context; languages are translated
   only while someone is listening (or listed in `ALWAYS_ON_LANGS`), and a translation failure
   degrades to the source text instead of silence.
-- **Seamless session rotation (Posta):** the Live API closes a session after ~10 minutes; the
+- **Seamless session rotation:** the Live API closes a session after ~10 minutes; the
   next one is opened before that, the switch happens at a pause, and finals are drained and
   de-duplicated. Measured on the real engine: 0 lost, 0 duplicated sentences across forced
   rotations.
-- **Operator panel (Mangrullo)** behind a Bearer token: stage table with state, latency and
-  cost estimate, start/stop, transcript export as **SRT / VTT / TXT** (Acta) per language.
-- **OBS overlay (Pizarrón):** a transparent browser-source page with `?lang=&lines=&size=`.
-- **Auto-glossary (Diccionario):** technical terms and proper names derived from the talk title
-  and abstract with Gemini structured output, merged after your manual list.
+- **Admin dashboard** behind a Bearer token: stage table with state, latency and cost
+  estimate, start/stop, transcript export as **SRT / VTT / TXT** per language.
+- **Overlay for OBS/vMix:** a transparent browser-source page with `?lang=&lines=&size=`.
+- **Auto-glossary:** technical terms and proper names derived from the talk title and
+  abstract with Gemini structured output, merged after your manual list.
 - **Dry-run mode** (`ENGINE=fake`) that exercises the whole UI without credentials.
 - **Measured, not claimed:** `make smoke-stt` reports word error rate, first-partial and
   utterance-to-final latency percentiles and token usage against bundled samples with known
@@ -57,7 +57,7 @@ cp .env.example .env      # set GEMINI_API_KEY=… (or ENGINE=fake for a credent
 docker compose up --build
 ```
 
-Then open http://localhost:8000 and click **Open Fogón · live captions** on a stage. Full walkthrough,
+Then open http://localhost:8000 and click **Open live captions** on a stage. Full walkthrough,
 developer path and troubleshooting: [docs/deploy/quickstart.md](docs/deploy/quickstart.md).
 
 **Requirements:** Docker (or Python 3.12 + [uv](https://docs.astral.sh/uv/) + Node 24 +
@@ -66,31 +66,26 @@ ffmpeg for the developer path). **Credentials:** one Gemini API key from
 with billing enabled for real events. **Models** (all configurable): `gemini-3.5-transcribe-live`
 (captions), `gemini-3.5-flash-lite` (translation), `gemini-3.8-flash-lite-tts` (test audio).
 
-## Naming
+## Components
 
-Components carry names from the lenguaraz's world on the surface (UI, routes, metrics, docs)
-and descriptive technical names in the code:
-
-| Surface name | Component | Code module | Meaning |
-|---|---|---|---|
-| **Oído** (`oido`) | Audio ingest (ffmpeg / browser) | `ingest/` | "The ear" — listens to the stage |
-| **Lengua** (`lengua`) | Live transcription | `stt/` | "Tongue / language" — turns voice into words |
-| **Parla** (`parla`) | Text translation fan-out | `translate/` | Rioplatense for "the gift of speech" — says it in every language |
-| **Posta** (`posta`) | Make-before-break session rotation | `stt/rotation.py` | Relay stations where messengers changed horses without stopping the message |
-| **Baqueano** (`baqueano`) | Language-demand reconciler (D8) | `translate/demand.py` | The guide who knows which paths to open and which to close |
-| **Chasque** (`chasque`) | Event bus and audience fan-out | `bus/` | The messenger who carries the word to everyone |
-| **Fogón** (`/fogon/{stage}`) | Audience view | `web/src/pages/Fogon.tsx` | The campfire where people gather to listen |
-| **Mangrullo** (`/mangrullo`) | Production monitoring & admin | `web/src/pages/Mangrullo.tsx`, `api/admin.py` | The frontier watchtower — sees everything |
-| **Pizarrón** (`/pizarron/{stage}`) | OBS/vMix overlay | `web/src/pages/Pizarron.tsx` | The general store's chalkboard, visible to all |
-| **Diccionario** (`diccionario`) | Glossary + auto-glossary | `glossary/` | The lenguaraz's knowledge |
-| **Acta** (`acta`) | SRT/VTT/TXT export | `export.py` | The written record of the parley |
+| Component | Code | What it does |
+|---|---|---|
+| Audio ingest | `lenguaraz/ingest/` | ffmpeg or WAV reader → 16 kHz mono PCM chunks |
+| Transcription | `lenguaraz/stt/` | Gemini Live API session: partial and final captions, hybrid VAD, session rotation, stall watchdog |
+| Translation | `lenguaraz/translate/` | Per-language workers, glossary-aware prompts, demand-driven (only languages with listeners) |
+| Event bus | `lenguaraz/bus/` | Bounded fan-out to WebSocket clients; interims may be dropped, finals never |
+| Glossary | `lenguaraz/glossary/` | Manual list + auto-glossary from the talk title/abstract (structured output) |
+| Transcript export | `lenguaraz/export.py` | In-memory transcript per stage/language, SRT/VTT/TXT |
+| Live captions page | `web/src/pages/LiveCaptions.tsx` (`/live/{stage}`) | Audience view: stage, language, font size, contrast, dark mode |
+| Overlay | `web/src/pages/Overlay.tsx` (`/overlay/{stage}`) | Transparent browser source for OBS/vMix |
+| Admin | `web/src/pages/Admin.tsx`, `lenguaraz/api/admin.py` (`/admin`) | Operator dashboard behind ADMIN_TOKEN: states, latency, cost, start/stop, exports |
 
 ## Architecture in one picture
 
 ```
 stages.yaml ─▶ one isolated pipeline per stage:
-  Oído (ffmpeg / WAV) ─▶ Lengua (Gemini Live STT, interim + final) ─▶ Chasque (bus) ─▶ WS /ws/{stage}?lang=
-                                                                                        └▶ Fogón (audience)
+  Ingest (ffmpeg / WAV) ─▶ Transcription (Gemini Live STT, interim + final) ─▶ Event bus ─▶ WS /ws/{stage}?lang=
+                                                                                            └▶ Live captions /live/{stage}
 ```
 
 Details, event contract and endpoints: [docs/architecture.md](docs/architecture.md).
@@ -161,13 +156,13 @@ content to improve its products; use a **paid-tier project** for real events.
 
 - **One process owns its stages.** Scale out by running several instances with disjoint
   `stages.yaml` files; there is no shared bus yet (planned, cut from the hackathon scope).
-- **Captions are not persisted.** Export SRT/VTT/TXT from Mangrullo before stopping a stage.
+- **Captions are not persisted.** Export SRT/VTT/TXT from the Admin page before stopping a stage.
 - **Latency depends on the source.** Measured ≈0.9 s from the end of a sentence to its final
   caption on clean audio (`docs/metrics.md`); HLS inputs add their segment length.
 - **Quality depends on the audio and the glossary.** A music bed or a distant microphone hurts
   recognition more than any setting; the glossary fixes names, not noise.
 - **The Live API has variance.** Sessions occasionally stall; the watchdog reopens them after
-  `STT_STALL_SECONDS` and the operator sees it as `stalls` in Mangrullo.
+  `STT_STALL_SECONDS` and the operator sees it as `stalls` in the Admin dashboard.
 - **Concurrent sessions are a Google project quota**, per tier; plan them before the event
   (`docs/deploy/scaling.md`).
 - Spoken interpretation, browser microphone ingest and an offline fallback are specified in the

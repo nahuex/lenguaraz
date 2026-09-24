@@ -14,7 +14,7 @@ docker compose up --build
 ```
 
 Abrí http://localhost:8000. Vas a ver dos escenarios ("Main Stage" y "Workshop Room") con
-una etiqueta **DRY-RUN**. Hacé clic en **Open Fogón · live captions** en un escenario: los
+una etiqueta **DRY-RUN**. Hacé clic en **Open live captions** en un escenario: los
 subtítulos aparecen en unos segundos, palabra por palabra, desde los clips incluidos.
 `http://localhost:8000/healthz` devuelve `{"status":"ok","engine":"fake","stages":2,…}`.
 
@@ -52,7 +52,7 @@ stages:
 ```
 
 Reiniciá el contenedor (`docker compose restart`). Compartí
-`http://<tu-host>:8000/fogon/main` con la audiencia. Cualquier cosa que ffmpeg pueda leer
+`http://<tu-host>:8000/live/main` con la audiencia. Cualquier cosa que ffmpeg pueda leer
 sirve como `source`; `docs/deploy/audio-sources.md` tiene recetas para OBS, vMix, HLS y SRT.
 Para un despliegue público con TLS, `docs/deploy/production.md`; para Google Cloud,
 `docs/deploy/cloud-run.md`.
@@ -75,6 +75,7 @@ WAV mono de 16 kHz.
 |---|---|
 | El escenario muestra `STOPPED` con `cannot open WAV` / `ffmpeg exited` | La ruta o URL del `source` está mal, o falta ffmpeg → corregí la ruta, instalá ffmpeg o definí `FFMPEG_BIN`. |
 | El escenario muestra `DEGRADED` con `quota exhausted (429…)` | Límites del tier gratuito o tope de gasto → habilitá facturación en el proyecto, o reducí escenarios concurrentes. |
+| Los subtítulos muestran la marca `original` / el detalle dice `rate limited (429)` | El proyecto de Gemini está en el **tier gratuito** para el modelo de texto (`generate_content_free_tier_requests`, 15 solicitudes/min): la traducción se pausa el tiempo que pide el servidor y mientras tanto se muestra el texto original → vinculá una cuenta de facturación de Cloud al proyecto de AI Studio (Tier 1); hasta entonces poné `PROGRESSIVE_TRANSLATION=false` y dejá un solo idioma destino. |
 | El escenario muestra `STOPPED` con `authentication failed` | `GEMINI_API_KEY` incorrecta → pegá la key de AI Studio en `.env`. |
 | `ROTATING` por un instante cada ~9 minutos | Normal: la sesión Live dura 10 minutos; Lenguaraz abre la siguiente antes y cambia en una pausa (no se pierde ninguna frase). |
 | Los subtítulos se detienen mientras el orador habla | El watchdog reabre la sesión después de `STT_STALL_SECONDS`; si se repite, revisá el nivel de audio (`docs/troubleshooting.md`). |

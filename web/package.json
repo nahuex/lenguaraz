@@ -4,7 +4,7 @@
   "version": "0.1.0",
   "type": "module",
   "license": "Apache-2.0",
-  "description": "Lenguaraz web front-end: live captions (Fogon) served by the Lenguaraz backend",
+  "description": "Lenguaraz web front-end: live captions, overlay and admin pages served by the Lenguaraz backend",
   "engines": {
     "node": ">=20.19"
   },

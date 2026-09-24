@@ -40,9 +40,22 @@ export function CaptionView({ finals, interim, lines, showOriginal }: CaptionVie
         )}
         {visible.map((caption) => (
           <div key={caption.seq} data-seq={caption.seq} data-final="true">
-            <p className="caption-line text-caption">{caption.text}</p>
+            <p className="caption-line text-caption">
+              {caption.text}
+              {caption.degraded ? (
+                <span
+                  className="ml-2 align-middle text-[0.45em] font-medium uppercase tracking-wide text-ink-muted"
+                  title="Translation unavailable right now; showing the original"
+                >
+                  original
+                </span>
+              ) : null}
+            </p>
             {showOriginal && hasDistinctOriginal(caption) && (
-              <p className="caption-line mt-1 text-[0.6em] text-ink-muted" lang={caption.source_lang}>
+              <p
+                className="caption-line mt-1 text-[0.6em] text-ink-muted"
+                lang={caption.source_lang}
+              >
                 {caption.original}
               </p>
             )}
@@ -53,7 +66,10 @@ export function CaptionView({ finals, interim, lines, showOriginal }: CaptionVie
         <div data-seq={interim.seq} data-interim="true" aria-live="off">
           <p className="caption-line text-caption italic text-interim">{interim.text}</p>
           {showOriginal && hasDistinctOriginal(interim) && (
-            <p className="caption-line mt-1 text-[0.6em] italic text-ink-muted" lang={interim.source_lang}>
+            <p
+              className="caption-line mt-1 text-[0.6em] italic text-ink-muted"
+              lang={interim.source_lang}
+            >
               {interim.original}
             </p>
           )}

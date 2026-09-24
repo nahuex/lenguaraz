@@ -30,9 +30,24 @@ Key design decisions:
 - **D8** Demand-driven language fan-out: active languages = `always_on` ∪ languages with ≥1 listener; reconcile with 250 ms debounce and 10 s grace (prior-art PA-1 L1, PA-2).
 - **D9** LiveKit is an optional adapter for large-audience spoken interpretation, not the base (prior-art D9).
 
-## 2b. Surface names (see Constitution → Naming convention)
-Oído (ingest) · Lengua (STT) · Parla (translation) · Posta (rotation) · Baqueano (language demand) · Chasque (bus/fan-out) · Fogón `/fogon/{stage}` (audience) · Mangrullo `/mangrullo` (admin/monitoring) · Pizarrón `/pizarron/{stage}` (overlay) · Diccionario (glossary) · Acta (export).
-APIs stay technical: `/api/...`, `WS /ws/{stage}`, `/healthz`.
+## 2b. Components (see Constitution → Naming convention; owner decision N1, 2026-09-24T22:45Z)
+Standard English names on every surface; the only Rioplatense word is the product name Lenguaraz.
+
+| Component | Code | Route / page |
+|---|---|---|
+| Audio ingest | `lenguaraz/ingest/` | — |
+| Transcription | `lenguaraz/stt/` | — |
+| Translation | `lenguaraz/translate/` | — |
+| Session rotation | `lenguaraz/stt/session.py` | — |
+| Language demand | `lenguaraz/translate/demand.py` | — |
+| Event bus | `lenguaraz/bus/` | `WS /ws/{stage}?lang=` |
+| Glossary / auto-glossary | `lenguaraz/glossary/` | — |
+| Transcript export | `lenguaraz/export.py` | `/api/stages/{id}/export` |
+| Live captions (audience view) | `web/src/pages/LiveCaptions.tsx` | `/live/{stage}` |
+| Overlay (OBS/vMix browser source) | `web/src/pages/Overlay.tsx` | `/overlay/{stage}` |
+| Admin (operator dashboard) | `web/src/pages/Admin.tsx`, `lenguaraz/api/admin.py` | `/admin` |
+
+APIs stay technical and unchanged: `/api/...`, `WS /ws/{stage}`, `/healthz`.
 
 ## 3. Stack
 Python 3.12 + uv · FastAPI + uvicorn · pydantic v2 + pydantic-settings · google-genai · ffmpeg · Vite + React + TypeScript + Tailwind · pytest + ruff + mypy · Docker Compose · optional Redis · GitHub Actions (Trivy, gitleaks, Syft).

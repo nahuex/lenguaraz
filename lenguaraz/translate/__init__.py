@@ -1,5 +1,5 @@
 # SPDX-License-Identifier: Apache-2.0
-"""Parla — text translation fan-out, and Baqueano — the language-demand reconciler."""
+"""Translation — text translation fan-out, and the language-demand reconciler."""
 
 from lenguaraz.translate.base import (
     TranslationEngine,

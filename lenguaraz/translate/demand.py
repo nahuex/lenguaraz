@@ -1,5 +1,5 @@
 # SPDX-License-Identifier: Apache-2.0
-"""Baqueano — which languages a stage should translate right now (design decision D8).
+"""Language demand — which languages a stage should translate right now (decision D8).
 
 active = always_on plus the languages that had at least one listener within the grace period,
 restricted to the stage's configured targets. Evaluated lazily whenever a caption arrives,
