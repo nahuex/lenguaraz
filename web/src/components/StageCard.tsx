@@ -1,0 +1,46 @@
+// SPDX-License-Identifier: Apache-2.0
+import { Link } from 'react-router-dom';
+import type { Stage } from '../lib/api';
+import { deriveShortCode, languageLabel } from '../lib/lang';
+import { StateBadge } from './StateBadge';
+
+interface StageCardProps {
+  stage: Stage;
+}
+
+export function StageCard({ stage }: StageCardProps) {
+  const sources = stage.source_lang.map(
+    (tag) => `${languageLabel(deriveShortCode(tag))} (${tag})`,
+  );
+  const headingId = `stage-${stage.id}-name`;
+
+  return (
+    <article
+      aria-labelledby={headingId}
+      className="flex flex-col gap-3 rounded-lg border border-line bg-surface-raised p-4"
+    >
+      <div className="flex flex-wrap items-center justify-between gap-2">
+        <h2 id={headingId} className="text-lg font-semibold">
+          {stage.name}
+        </h2>
+        <StateBadge state={stage.state} />
+      </div>
+      {stage.detail && <p className="text-sm text-ink-muted">{stage.detail}</p>}
+      <dl className="grid grid-cols-[auto_1fr] gap-x-3 gap-y-1 text-sm">
+        <dt className="text-ink-muted">Source</dt>
+        <dd>{sources.length > 0 ? sources.join(', ') : '—'}</dd>
+        <dt className="text-ink-muted">Targets</dt>
+        <dd>{stage.targets.length > 0 ? stage.targets.map(languageLabel).join(', ') : '—'}</dd>
+        <dt className="text-ink-muted">Listeners</dt>
+        <dd>{stage.listeners}</dd>
+      </dl>
+      <Link
+        to={`/fogon/${encodeURIComponent(stage.id)}`}
+        className="mt-auto inline-flex w-fit items-center rounded-md bg-accent px-4 py-2 font-semibold text-accent-ink hover:opacity-90"
+      >
+        Open Fogón
+        <span className="sr-only"> for {stage.name}</span>
+      </Link>
+    </article>
+  );
+}
