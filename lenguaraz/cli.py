@@ -25,6 +25,7 @@ def build_parser() -> argparse.ArgumentParser:
     for name, help_text in (
         ("samples", "generate test audio with Gemini TTS (uses quota)"),
         ("smoke-stt", "transcribe a sample with the real engine (uses quota)"),
+        ("smoke-translate", "translate sample segments with the real model (uses quota)"),
         ("mvp-check", "scripted check of the MVP gates"),
     ):
         sub.add_parser(name, help=help_text, add_help=False)  # tool parses its own options
@@ -46,6 +47,10 @@ def main(argv: Sequence[str] | None = None) -> int:
             from lenguaraz.tools.smoke_stt import main as smoke_main
 
             return smoke_main(extra)
+        if command == "smoke-translate":
+            from lenguaraz.tools.smoke_translate import main as smoke_translate_main
+
+            return smoke_translate_main(extra)
         if command == "mvp-check":
             from lenguaraz.tools.mvp_check import main as mvp_main
 

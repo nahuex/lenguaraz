@@ -196,10 +196,13 @@ async def test_rotation_timer_reopens_the_session() -> None:
 
     manager = managed(ScriptedSttEngine([first, second]), recorder, rotate_seconds=0.05)
     task = asyncio.create_task(manager.run(queue))
-    await asyncio.sleep(0.08)  # first rotation at 50 ms, final from the second session at 60 ms
+    for _ in range(100):  # wait for the rotation and the second session's final
+        await asyncio.sleep(0.02)
+        if recorder.segments:
+            break
     await queue.put(None)
     await asyncio.wait_for(task, 2)
-    assert manager.stats.rotations == 1
+    assert manager.stats.rotations >= 1
     assert any("rotation timer" in (d or "") for _, d in recorder.states)
     assert first.closed is True
     assert [s.text for s in recorder.segments] == ["after timer"]

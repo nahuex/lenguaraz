@@ -14,7 +14,7 @@ stages.yaml + .env ──▶ config (pydantic)
                             Lengua  stt/     ManagedSttSession ─▶ Gemini Live API (gemini-3.5-transcribe-live)
                              │               interim + final segments, seq, latency, reconnect, rotation (Posta)
                              │
-                            Parla   translate/  (feature 002) one text translation per active language
+                            Parla   translate/  one ordered translation worker per active language (Baqueano decides which)
                              │
                             Chasque bus/     in-memory pub/sub, bounded queues, drop-oldest-interim
                              │
@@ -32,7 +32,9 @@ stages.yaml + .env ──▶ config (pydantic)
 | — | `lenguaraz/runner.py` | `StageRunner` (ingest → session → bus, metrics ticker) and `StageManager`. A failure in one stage never affects another. |
 | — | `lenguaraz/api/` | FastAPI app: health, stage list, caption WebSocket with per-IP limits, SPA serving. |
 | Fogón | `web/src/pages/Fogon.tsx` | Audience view: stage + language, font size, contrast, dark mode, `aria-live` captions, reconnecting socket. |
-| Acta, Mangrullo, Pizarrón, Diccionario, Baqueano | features 002–006 | Export, admin, overlay, glossary, language demand. |
+| Parla | `lenguaraz/translate/fanout.py` | One ordered worker per (stage, language): every final caption is translated with the stage glossary and the last segments as context (Interactions API, `thinking_level: minimal`); retries with backoff; on persistent failure the caption is published with `degraded: true` and the original text. Progressive translation publishes a provisional line from a debounced partial. |
+| Baqueano | `lenguaraz/translate/demand.py` | Active languages = `ALWAYS_ON_LANGS` plus languages with a listener in the last `LANG_GRACE_SECONDS`, restricted to the stage's `targets`; evaluated at every caption. |
+| Acta, Mangrullo, Pizarrón, Diccionario | features 004–006 | Export, admin, overlay, auto-glossary. |
 
 ## Stage states
 

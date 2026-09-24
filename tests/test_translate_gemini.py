@@ -24,8 +24,8 @@ class Delta:
 @dataclass
 class Usage:
     total_tokens: int
-    input_tokens: int
-    output_tokens: int
+    total_input_tokens: int
+    total_output_tokens: int
 
 
 @dataclass
@@ -82,6 +82,7 @@ class FakeClient:
 
 
 def settings(**overrides: Any) -> Settings:
+    overrides.setdefault("gemini_translate_api", "interactions")
     return Settings(_env_file=None, engine="gemini", gemini_api_key="AIza-test", **overrides)
 
 
@@ -119,7 +120,7 @@ async def test_streams_text_deltas_and_records_usage() -> None:
 
     call = interactions.calls[0]
     assert call["model"] == "gemini-3.5-flash-lite"
-    assert call["stream"] is True
+    assert call["stream"] is True and call["store"] is False
     assert call["generation_config"] == {"thinking_level": "minimal", "max_output_tokens": 512}
     assert "from English into Spanish" in call["system_instruction"]
     assert "<glossary>\neBPF\n</glossary>" in call["input"]
@@ -173,3 +174,56 @@ async def test_output_is_cleaned() -> None:
     outcome = await engine.translate(REQUEST)
     assert outcome.text == "Hola a todos."
     assert outcome.usage.calls == 1 and outcome.usage.total_tokens == 0
+
+
+@dataclass
+class Metadata:
+    prompt_token_count: int
+    candidates_token_count: int
+    total_token_count: int
+
+
+@dataclass
+class Chunk:
+    text: str | None = None
+    usage_metadata: Metadata | None = None
+
+
+class FakeModels:
+    def __init__(self, chunks: list[Chunk]) -> None:
+        self._chunks = chunks
+        self.calls: list[dict[str, Any]] = []
+
+    async def generate_content_stream(self, **kwargs: Any) -> FakeStream:
+        self.calls.append(kwargs)
+        return FakeStream(self._chunks)  # type: ignore[arg-type]
+
+
+class FakeModelsClient:
+    def __init__(self, models: FakeModels) -> None:
+        self.aio = self
+        self.models = models
+
+
+async def test_generate_content_stream_transport_is_the_default() -> None:
+    models = FakeModels(
+        [
+            Chunk(text="Hola "),
+            Chunk(text="a todos.", usage_metadata=Metadata(210, 12, 222)),
+        ]
+    )
+    engine = GeminiTranslationEngine(
+        settings(gemini_translate_api="generate_content", gemini_translate_thinking="low"),
+        client=FakeModelsClient(models),
+    )
+    deltas: list[str] = []
+    outcome = await engine.translate(REQUEST, on_delta=deltas.append)
+    assert outcome.text == "Hola a todos." and deltas == ["Hola ", "a todos."]
+    assert outcome.usage.input_tokens == 210 and outcome.usage.output_tokens == 12
+    call = models.calls[0]
+    assert call["model"] == "gemini-3.5-flash-lite" and call["contents"].endswith("</text>")
+    config = call["config"]
+    assert "from English into Spanish" in config.system_instruction
+    assert config.max_output_tokens == 512
+    assert str(config.thinking_config.thinking_level).upper().endswith("LOW")
+    assert Settings(_env_file=None, engine="fake").gemini_translate_api == "generate_content"

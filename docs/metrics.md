@@ -44,3 +44,10 @@ Measured by the project's own tooling (Constitution Art. V.2); definitions below
 - The Live transcription session sent no `usage_metadata`; cost is estimated from audio
   seconds (25 tokens/s) plus response characters ÷ 4.
 | 2026-09-24 17:27 | es_asyncio.wav | SMART | 7 | 4.3% | 2359/5044 | 777/981 | 469/1234 | 0/0 | 0.0072 |
+
+## smoke-translate runs
+
+| Date (UTC) | Direction | Segments | TTFT p50/p95 ms | Total p50/p95 ms | Glossary adherence | Tokens (in/out) | Est. cost USD |
+|---|---|---|---|---|---|---|---|
+| 2026-09-24 21:01 | en-US→es | 5 | 687/2594 | 750/2954 | 8/8 (100%) | 1752/102 | 0.0008 |
+| 2026-09-24 21:01 | es-419→en | 3 | 844/7343 | 891/7468 | 3/3 (100%) | 919/45 | 0.0004 |

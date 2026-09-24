@@ -43,8 +43,8 @@ web: ## Build the audience view into web/dist
 smoke-stt: ## Real Gemini call: transcribe samples/en_kubernetes.wav, print WER/latency/tokens (uses quota)
 	$(UV) run lenguaraz smoke-stt $(SMOKE_ARGS)
 
-smoke-translate: ## Real Gemini call: translate a sample segment (feature 002; uses quota)
-	@echo "smoke-translate: not implemented yet (feature 002)"; exit 1
+smoke-translate: ## Real Gemini call: translate sample segments EN->ES and ES->EN, report TTFT/latency/tokens/glossary adherence (uses quota)
+	$(UV) run lenguaraz smoke-translate $(SMOKE_ARGS)
 
 simulate: ## Replay N stages concurrently and write the scale report (feature 005)
 	@echo "simulate: not implemented yet (feature 005)"; exit 1

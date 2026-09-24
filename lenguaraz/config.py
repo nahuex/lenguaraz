@@ -243,6 +243,9 @@ class Settings(BaseSettings):
     translate_max_output_tokens: int = Field(default=512, ge=16, le=8192)
     gemini_translate_thinking: str = Field(default="minimal", pattern="^(minimal|low|medium|high)$")
     translate_context_segments: int = Field(default=3, ge=0, le=10)
+    gemini_translate_api: str = Field(
+        default="generate_content", pattern="^(generate_content|interactions)$"
+    )
     log_transcripts: bool = False
     redis_url: str = ""
     stages_file: Path = Path("stages.yaml")

@@ -35,6 +35,7 @@ editing files.
 | `LANG_RECONCILE_DEBOUNCE_MS` | integer 0–5000 | `250` | Documented upper bound for reacting to listener changes; the demand is evaluated at every caption, so a new listener is served by the next final. |
 | `TRANSLATE_CONTEXT_SEGMENTS` | integer 0–10 | `3` | Previous (source, translation) pairs sent as context to keep terminology and tense consistent. |
 | `TRANSLATE_MAX_OUTPUT_TOKENS` | integer 16–8192 | `512` | Cap on the translation length per segment. |
+| `GEMINI_TRANSLATE_API` | `generate_content` \| `interactions` | `generate_content` | Transport for translation calls. `generate_content` (streaming) measured a 578 ms median time-to-first-token on `gemini-3.5-flash-lite` versus 1407 ms through the Interactions API on 2026-09-24; both are supported by the official SDK. |
 | `GEMINI_TRANSLATE_THINKING` | `minimal` \| `low` \| `medium` \| `high` | `minimal` | Thinking level for the translation model; `minimal` gives the lowest latency and cost. |
 | `LOG_TRANSCRIPTS` | boolean | `false` | When `true`, caption text is written to the logs. Off by default for privacy. |
 | `REDIS_URL` | URL | *(empty)* | When set, the event bus uses Redis so several workers can share stages (feature 005). Empty = in-memory bus, single process. |
