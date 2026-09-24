@@ -11,6 +11,7 @@ from __future__ import annotations
 
 import argparse
 import sys
+import threading
 import time
 from collections.abc import Sequence
 from dataclasses import dataclass
@@ -31,21 +32,35 @@ class Gate:
 
 
 def collect_captions(client: Any, stage_id: str, lang: str, seconds: float) -> list[CaptionEvent]:
+    """Read caption events for up to ``seconds``.
+
+    ``TestClient`` sockets are synchronous and ``receive_text`` has no timeout, so a stage
+    that never captions (quota, network) would block forever. The reader runs in a daemon
+    thread and is abandoned at the deadline; whatever arrived is returned.
+    """
     captions: list[CaptionEvent] = []
-    with client.websocket_connect(f"/ws/{stage_id}?lang={lang}") as ws:
-        first = parse_event(ws.receive_text())
-        assert isinstance(first, StatusEvent)
-        deadline = time.monotonic() + seconds
-        while time.monotonic() < deadline:
-            try:
-                event = parse_event(ws.receive_text())
-            except Exception:
-                break
-            if isinstance(event, CaptionEvent):
-                captions.append(event)
-                if any(c.is_final for c in captions) and len(captions) >= 3:
-                    break
-    return captions
+
+    def reader() -> None:
+        try:
+            with client.websocket_connect(f"/ws/{stage_id}?lang={lang}") as ws:
+                first = parse_event(ws.receive_text())
+                assert isinstance(first, StatusEvent)
+                deadline = time.monotonic() + seconds
+                while time.monotonic() < deadline:
+                    event = parse_event(ws.receive_text())
+                    if isinstance(event, CaptionEvent):
+                        captions.append(event)
+                        if any(c.is_final for c in captions) and len(captions) >= 3:
+                            break
+        except Exception:
+            return
+
+    thread = threading.Thread(target=reader, name=f"mvp-collect-{stage_id}", daemon=True)
+    thread.start()
+    thread.join(seconds + 5.0)
+    if thread.is_alive():
+        print(f"  [{stage_id}] no events within {seconds:.0f}s; giving up on this socket")
+    return list(captions)
 
 
 def run(settings: Settings, stages_path: Path, seconds: float) -> list[Gate]:
@@ -108,7 +123,11 @@ def run(settings: Settings, stages_path: Path, seconds: float) -> list[Gate]:
             sample = next(c for c in results[live[0]] if c.is_final)
             by_id["MVP-3"].note = f"{live[0]} [{sample.lang}] “{sample.text[:60]}”"
         else:
-            by_id["MVP-1"].note = "no captions received"
+            states = {
+                row["id"]: f"{row['state']} {row.get('detail') or ''}".strip()
+                for row in client.get("/api/stages").json()
+            }
+            by_id["MVP-1"].note = f"no captions received; stages: {states}"
             by_id["MVP-3"].note = "no final caption received"
         if len(live) >= 2:
             by_id["MVP-6"].status = "PASS"
