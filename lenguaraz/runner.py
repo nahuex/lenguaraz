@@ -17,6 +17,7 @@ from typing import Any
 from lenguaraz.bus.base import Bus
 from lenguaraz.config import Settings, StageConfig, StagesFile, VadMode, short_code
 from lenguaraz.ingest import AudioSource, IngestError, open_source
+from lenguaraz.ingest.base import is_local_file
 from lenguaraz.metrics import StageMetrics
 from lenguaraz.models import CaptionEvent, MetricsEvent, StageState, StatusEvent
 from lenguaraz.stt.base import SttEngine
@@ -56,6 +57,8 @@ class StageRunner:
         self.session: ManagedSttSession | None = None
         self._task: asyncio.Task[None] | None = None
         self._source_error: str | None = None
+        self._live_once = asyncio.Event()
+        self.chunks_dropped = 0
         self._log = logging.LoggerAdapter(log, {"stage_id": stage.id, "component": "Oído/Lengua"})
 
     # -- lifecycle ----------------------------------------------------------------------
@@ -94,6 +97,9 @@ class StageRunner:
                 self._settings.vad_silence_ms if self._settings.vad_mode is VadMode.HYBRID else None
             ),
             vad_threshold=self._settings.vad_threshold,
+            drain_seconds=self._settings.rotation_drain_seconds,
+            dedupe_window=self._settings.dedupe_window_seconds,
+            swap_max_wait=self._settings.rotation_swap_max_wait_seconds,
         )
         if self._translator is not None and self.stage.targets:
             self.fanout = TranslationFanout(
@@ -139,9 +145,21 @@ class StageRunner:
                     await self.fanout.stop()
 
     async def _pump(self, source: AudioSource, queue: asyncio.Queue[bytes | None]) -> None:
+        """Feed the queue. Files wait for the first LIVE (no backlog burst); streams never
+        block: when the queue is full the oldest chunk is dropped and counted."""
+        local_file = is_local_file(self.stage.source)
         try:
+            if local_file:
+                await self._live_once.wait()
             async for chunk in source.chunks():
-                await queue.put(chunk)
+                if local_file:
+                    await queue.put(chunk)
+                    continue
+                if queue.full():
+                    with contextlib.suppress(asyncio.QueueEmpty):
+                        queue.get_nowait()
+                        self.chunks_dropped += 1
+                queue.put_nowait(chunk)
         except IngestError as exc:
             self._source_error = f"source error: {exc}"
             self._log.error("ingest failed: %s", exc)
@@ -168,6 +186,10 @@ class StageRunner:
     def _set_state(self, state: StageState, detail: str | None) -> None:
         self.state = state
         self.detail = detail
+        if state is StageState.LIVE:
+            self._live_once.set()
+        elif state is StageState.STOPPED:
+            self._live_once.set()  # release a waiting file pump so it can exit
         self._log.info("state=%s detail=%s", state.value, detail)
         self._bus.publish(
             self.stage.id, StatusEvent(stage_id=self.stage.id, state=state, detail=detail)
@@ -230,6 +252,9 @@ class StageRunner:
             "session_id": self.session.session_id if self.session else None,
             "rotations": stats.rotations if stats else 0,
             "errors": stats.errors if stats else 0,
+            "duplicates_dropped": stats.duplicates_dropped if stats else 0,
+            "last_rotation_gap_ms": stats.last_rotation_gap_ms if stats else None,
+            "chunks_dropped": self.chunks_dropped,
             "captions_final": self.metrics.captions_final,
             "p50_ms": self.metrics.finals.p50,
             "p95_ms": self.metrics.finals.p95,

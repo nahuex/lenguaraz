@@ -150,3 +150,80 @@ async def test_source_factory_failure_is_reported(tmp_path: Path) -> None:
         and "device busy" in (e.detail or "")
         for e in events
     )
+
+
+class SlowOpenEngine:
+    """Wraps the fake engine with a connect delay, like a real Live handshake."""
+
+    name = "slow"
+
+    def __init__(self, delay: float) -> None:
+        self._inner = FakeSttEngine(words_per_second=10)
+        self._delay = delay
+
+    async def open(self, stage: StageConfig):  # type: ignore[no-untyped-def]
+        await asyncio.sleep(self._delay)
+        return await self._inner.open(stage)
+
+
+class FloodSource:
+    """A live stream that produces audio faster than real time and never ends."""
+
+    def __init__(self, chunks: int) -> None:
+        self._chunks = chunks
+        self.closed = False
+        self._stop = asyncio.Event()
+
+    async def chunks(self):  # type: ignore[no-untyped-def]
+        for _ in range(self._chunks):
+            yield bytes(3200)
+            await asyncio.sleep(0)
+        await self._stop.wait()
+
+    async def close(self) -> None:
+        self.closed = True
+        self._stop.set()
+
+
+async def test_file_source_waits_for_live(tmp_path: Path) -> None:
+    """Spec 003 AC-4: nothing is replayed before the session is connected."""
+    bus = MemoryBus()
+    wav = write_wav(tmp_path / "talk.wav", 2.0)
+    runner = StageRunner(
+        StageConfig(id="f", name="F", source=str(wav), source_lang=["en-US"]),
+        engine=SlowOpenEngine(0.3),  # type: ignore[arg-type]
+        bus=bus,
+        settings=settings(),
+        source_factory=fast_source,
+        metrics_interval=1.0,
+    )
+    await runner.start()
+    await asyncio.sleep(0.15)
+    assert runner.state is StageState.STARTING
+    assert runner.session is not None and runner.session.stats.bytes_sent == 0
+    await asyncio.sleep(0.4)
+    assert runner.state is StageState.LIVE
+    assert runner.session.stats.bytes_sent > 0
+    await runner.stop()
+
+
+async def test_live_source_drops_oldest_when_the_queue_is_full() -> None:
+    """Spec 003 AC-5: a stream never blocks; the backlog is bounded and counted."""
+    bus = MemoryBus()
+    flood = FloodSource(chunks=300)
+    runner = StageRunner(
+        StageConfig(id="s", name="S", source="srt://10.0.0.5:9000", source_lang=["en-US"]),
+        engine=SlowOpenEngine(0.3),  # type: ignore[arg-type]
+        bus=bus,
+        settings=settings(),
+        source_factory=lambda source, **_: flood,
+        metrics_interval=1.0,
+    )
+    await runner.start()
+    await asyncio.sleep(0.2)
+    assert runner.chunks_dropped >= 200  # 300 chunks flooded into a 50-chunk queue
+    assert runner.snapshot()["chunks_dropped"] == runner.chunks_dropped
+    await asyncio.sleep(0.3)
+    assert runner.state is StageState.LIVE
+    await runner.stop()
+    assert flood.closed is True

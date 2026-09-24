@@ -234,6 +234,9 @@ class Settings(BaseSettings):
     vad_silence_ms: int = Field(default=500, ge=100, le=5000)
     vad_threshold: int = Field(default=300, ge=1, le=20000)
     session_rotate_seconds: int = Field(default=540, ge=30, le=600)
+    rotation_drain_seconds: float = Field(default=3.0, ge=0, le=30)
+    dedupe_window_seconds: float = Field(default=5.0, ge=0, le=60)
+    rotation_swap_max_wait_seconds: float = Field(default=8.0, ge=0, le=60)
     progressive_translation: bool = True
     always_on_langs: str = "es"  # comma-separated short codes translated even with no listener
     lang_grace_seconds: float = Field(default=10.0, ge=0, le=600)

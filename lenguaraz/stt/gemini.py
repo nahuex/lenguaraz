@@ -65,6 +65,8 @@ def classify_error(exc: BaseException) -> SttEvent:
     status = getattr(exc, "status", None)
     message = getattr(exc, "message", None) or str(exc)
     retryable = code is None or code in RETRYABLE_CODES
+    if message.strip().startswith("1000"):
+        message = f"connection closed ({message.strip()})"
     if code == 429:
         message = f"quota exhausted (429 {status or 'RESOURCE_EXHAUSTED'}): {message}"
     elif code in (401, 403):

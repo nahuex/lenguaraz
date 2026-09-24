@@ -28,6 +28,7 @@ stages.yaml + .env ──▶ config (pydantic)
 |---|---|---|
 | Oído | `lenguaraz/ingest/` | Turn any source into raw s16le mono 16 kHz audio in 100 ms chunks. Files replay in real time; streams pass through. One ffmpeg process per stage, terminated on stop. |
 | Lengua | `lenguaraz/stt/` | `SttEngine` interface; `GeminiSttEngine` (Live API) and `FakeSttEngine` (dry run). `ManagedSttSession` owns states, `seq`, latency, backoff and session rotation. |
+| Posta | `lenguaraz/stt/session.py` | Make-before-break rotation: on the timer (`SESSION_ROTATE_SECONDS`) or the server's `GoAway`, the next Live session is opened while the current one keeps listening; the audio feed switches once it is connected **and at the next pause** detected by the hybrid VAD (bounded by `ROTATION_SWAP_MAX_WAIT_SECONDS`), so no sentence is split; the old session gets `audio_stream_end`, drains for `ROTATION_DRAIN_SECONDS` and is closed; late duplicates are dropped (`DEDUPE_WINDOW_SECONDS`); `seq` continues; the caption gap is measured (`last_rotation_gap_ms`). |
 | Chasque | `lenguaraz/bus/` | Publish/subscribe per stage with a bounded queue per listener. Under backpressure the oldest interim is dropped first; a final or status event is never dropped (a listener that cannot keep up is closed and reconnects). |
 | — | `lenguaraz/runner.py` | `StageRunner` (ingest → session → bus, metrics ticker) and `StageManager`. A failure in one stage never affects another. |
 | — | `lenguaraz/api/` | FastAPI app: health, stage list, caption WebSocket with per-IP limits, SPA serving. |
@@ -39,6 +40,7 @@ stages.yaml + .env ──▶ config (pydantic)
 ## Stage states
 
 Every stage is always in exactly one state: `IDLE → STARTING → LIVE ⇄ ROTATING | DEGRADED → STOPPED`.
+`ROTATING` lasts from the moment the next session is being opened until the audio feed has switched (usually well under a second); captions keep flowing from the old session meanwhile.
 Transitions are published as `status` events with a human-readable `detail` (for example
 `connect failed: …; retry 2/5 in 1.3s`, `server GoAway (12s left)`, `source ended`).
 

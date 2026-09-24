@@ -133,7 +133,13 @@ def fmt_p(values: list[int]) -> str:
     return f"{percentile(values, 50)}/{percentile(values, 95)}" if values else "n/a"
 
 
-async def run(sample: Path, stage: StageConfig, mode: str | None, verbose: bool = False) -> int:
+async def run(
+    sample: Path,
+    stage: StageConfig,
+    mode: str | None,
+    verbose: bool = False,
+    rotate: int | None = None,
+) -> int:
     settings = load_settings(**({"stt_mode": mode} if mode else {}))
     if settings.engine is not EngineKind.GEMINI:
         raise ConfigError("smoke-stt needs ENGINE=gemini and a GEMINI_API_KEY in .env")
@@ -146,8 +152,15 @@ async def run(sample: Path, stage: StageConfig, mode: str | None, verbose: bool 
     finals: list[tuple[float, Segment]] = []
     start_wall = time.monotonic()
 
+    rotation_marks: list[tuple[int, int]] = []  # (rotation number, t_audio_ms of its first caption)
+    seen_rotations = 0
+
     def emit(segment: Segment) -> None:
+        nonlocal seen_rotations
         now = time.monotonic()
+        if session.stats.rotations > seen_rotations:
+            seen_rotations = session.stats.rotations
+            rotation_marks.append((seen_rotations, segment.t_audio_ms))
         stamp = f"{segment.t_audio_ms / 1000:6.1f}s +{segment.latency_ms:4d}ms"
         if segment.is_final:
             finals.append((now, segment))
@@ -164,9 +177,12 @@ async def run(sample: Path, stage: StageConfig, mode: str | None, verbose: bool 
         engine,
         emit=emit,
         on_state=on_state,
-        rotate_seconds=540,
+        rotate_seconds=float(rotate or settings.session_rotate_seconds),
         vad_silence_ms=settings.vad_silence_ms if settings.vad_mode is VadMode.HYBRID else None,
         vad_threshold=settings.vad_threshold,
+        drain_seconds=settings.rotation_drain_seconds,
+        dedupe_window=settings.dedupe_window_seconds,
+        swap_max_wait=settings.rotation_swap_max_wait_seconds,
     )
     queue: asyncio.Queue[bytes | None] = asyncio.Queue(maxsize=50)
     source = open_source(str(sample), ffmpeg_bin=settings.ffmpeg_bin, realtime=True, loop=False)
@@ -203,6 +219,24 @@ async def run(sample: Path, stage: StageConfig, mode: str | None, verbose: bool 
     print(f"sample: {sample}  mode: {settings.stt_mode.value}  model: {settings.gemini_stt_model}")
     print(f"finals: {len(finals)}  interims: {len(interims)}  sessions: {stats.sessions_opened}")
     print(f"errors: {stats.errors}  rotations: {stats.rotations}  vad_signals: {stats.vad_signals}")
+    if rotate:
+        expected = len(boundaries) if boundaries else None
+        lost = (expected - len(finals)) if expected is not None else "n/a"
+        gap = stats.last_rotation_gap_ms
+        print(
+            f"forced rotation every {rotate}s: rotations={stats.rotations} "
+            f"duplicates_dropped={stats.duplicates_dropped} lost_sentences={lost} "
+            f"last_rotation_gap_ms={gap}"
+        )
+        after: list[int] = []
+        for _number, t_audio in rotation_marks:
+            index = max(
+                (i for i, b in enumerate(boundaries) if b["start_ms"] <= t_audio), default=None
+            )
+            if index is not None and index < len(first):
+                after.append(first[index])
+        if after:
+            print(f"first partial of the sentence after each rotation (ms): {after}")
     vad = f"{settings.vad_mode.value} ({settings.vad_silence_ms} ms, rms {settings.vad_threshold})"
     print(f"vad: {vad}")
     print(f"WER vs reference: {wer:.1%}" if reference else "WER: no reference transcript")
@@ -277,13 +311,18 @@ def main(argv: Sequence[str] | None = None) -> int:
     parser.add_argument("--stage", default=None, help="stage id from stages.yaml")
     parser.add_argument("--mode", choices=["SMART", "VERBATIM"], default=None)
     parser.add_argument("--verbose", action="store_true", help="print every partial")
+    parser.add_argument(
+        "--rotate", type=int, default=None, help="force a session rotation every N seconds"
+    )
     args = parser.parse_args(argv)
     sample = Path(args.sample)
     if not sample.is_file():
         print(f"sample not found: {sample}", file=sys.stderr)
         return 2
     try:
-        return asyncio.run(run(sample, pick_stage(sample, args.stage), args.mode, args.verbose))
+        return asyncio.run(
+            run(sample, pick_stage(sample, args.stage), args.mode, args.verbose, args.rotate)
+        )
     except ConfigError as exc:
         print(f"configuration error: {exc}", file=sys.stderr)
         return 2

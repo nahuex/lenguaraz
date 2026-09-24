@@ -51,3 +51,22 @@ Measured by the project's own tooling (Constitution Art. V.2); definitions below
 |---|---|---|---|---|---|---|---|
 | 2026-09-24 21:01 | en-US→es | 5 | 687/2594 | 750/2954 | 8/8 (100%) | 1752/102 | 0.0008 |
 | 2026-09-24 21:01 | es-419→en | 3 | 844/7343 | 891/7468 | 3/3 (100%) | 919/45 | 0.0004 |
+| 2026-09-24 21:11 | en_kubernetes.wav | SMART | 8 | 11.6% | 1229/2266 | 354/920 | 515/2235 | 0/0 | 0.0059 |
+| 2026-09-24 21:12 | es_asyncio.wav | SMART | 6 | 32.6% | 8168/11090 | 702/6567 | 0/2063 | 0/0 | 0.0063 |
+| 2026-09-24 21:15 | en_kubernetes.wav | SMART | 5 | 32.6% | 923/1140 | 882/890 | 266/438 | 0/0 | 0.0051 |
+| 2026-09-24 21:17 | en_kubernetes.wav | SMART | 5 | 32.6% | n/a | 888/1014 | 0/0 | 0/0 | 0.0051 |
+| 2026-09-24 21:18 | en_kubernetes.wav | SMART | 7 | 3.2% | 1078/1358 | 954/1075 | 250/531 | 0/0 | 0.0059 |
+| 2026-09-24 21:19 | es_asyncio.wav | SMART | 7 | 4.3% | 936/2422 | 880/979 | 453/657 | 0/0 | 0.0072 |
+| 2026-09-24 21:21 | en_kubernetes.wav | SMART | 7 | 3.2% | 2766/3983 | 869/928 | 328/1375 | 0/0 | 0.0059 |
+| 2026-09-24 21:21 | es_asyncio.wav | SMART | 7 | 4.3% | 1012/4261 | 778/902 | 250/1078 | 0/0 | 0.0072 |
+- **2026-09-24 21:20Z — forced session rotation (spec 003), real engine, `make smoke-stt SMOKE_ARGS="--rotate 20"`:**
+  EN sample (33 s): 1 rotation, 7/7 sentences finalized, 0 lost, 0 duplicates, WER 3.2 %,
+  utterance-to-final p50/p95 869/928 ms. ES sample (49 s): 2 rotations, 7/7, 0 lost, 0 duplicates,
+  WER 4.3 %, utterance-to-final 778/902 ms. The switch happens at the next pause detected by the
+  hybrid VAD (make-before-break: the next session is opened while the old one still listens; the
+  old one drains its last final and is closed). `last_rotation_gap_ms` (4.9–5.0 s) is the
+  audio-timeline distance between the last committed final and the first caption of the new
+  session and therefore includes the natural pause between sentences; the audience-relevant
+  number is the first partial of the sentence after the switch: 2716 ms (EN) and 807 ms (ES) in
+  these runs, in the same range as sentences without a rotation. Interim counts vary a lot between
+  runs server-side (6–80 per 50 s) without affecting finals.
