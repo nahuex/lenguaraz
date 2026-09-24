@@ -27,6 +27,7 @@ editing files.
 | `VAD_SILENCE_MS` | integer 100–5000 | `500` | Silence after speech before the end-of-turn signal is sent (hybrid mode). |
 | `VAD_THRESHOLD` | integer 1–20000 | `300` | RMS level (16-bit scale) below which a 100 ms chunk counts as silence. Raise it for noisy rooms. |
 | `SESSION_ROTATE_SECONDS` | integer 30–600 | `540` | Live sessions last about 10 minutes; a new session is opened proactively after this many seconds (and on the server's `GoAway`). |
+| `STT_STALL_SECONDS` | integer 0–300 | `20` | Stall watchdog: if speech (chunks above `VAD_THRESHOLD`) keeps arriving but the transcription session sends nothing for this long, the session is closed and reopened (counted as `stalls` in the stage snapshot). `0` disables. |
 | `ROTATION_DRAIN_SECONDS` | number 0–30 | `3` | After the audio feed switches to the next Live session, the old one stays open this long to deliver its last final captions (Posta, make-before-break). |
 | `ROTATION_SWAP_MAX_WAIT_SECONDS` | number 0–60 | `8` | With hybrid VAD, the audio feed switches to the next session at the next pause so no sentence is split; if no pause is detected within this many seconds the switch happens anyway. |
 | `DEDUPE_WINDOW_SECONDS` | number 0–60 | `5` | A final caption whose words match one already published within this window is dropped (late duplicates from the old session). |

@@ -264,3 +264,63 @@ async def test_fake_engine_falls_back_to_demo_text_for_streams() -> None:
     stage = StageConfig(id="s", name="S", source="srt://host:9000", source_lang=[])
     session = await FakeSttEngine().open(stage)
     assert session._sentences == DEMO_SENTENCES["en"]
+
+
+LOUD = (10000).to_bytes(2, "little", signed=True) * 1600  # 3,200 bytes well above the RMS threshold
+
+
+async def wait_until(predicate, timeout: float = 2.0) -> None:  # type: ignore[no-untyped-def]
+    deadline = asyncio.get_running_loop().time() + timeout
+    while not predicate():
+        if asyncio.get_running_loop().time() > deadline:
+            raise AssertionError("condition not met in time")
+        await asyncio.sleep(0.01)
+
+
+async def test_stall_watchdog_reopens_a_silent_session() -> None:
+    """Spec 007 AC-5: speech flows, the server sends nothing → one stall, one new session."""
+    silent = ScriptedSttSession([], hold_open=True, session_id="silent")
+    fresh = ScriptedSttSession(
+        [(0.01, SttEvent.final("Recovered."))], hold_open=True, session_id="fresh"
+    )
+    recorder = Recorder()
+    queue: asyncio.Queue[bytes | None] = asyncio.Queue()
+    manager = managed(ScriptedSttEngine([silent, fresh]), recorder, stall_seconds=0.3)
+    task = asyncio.create_task(manager.run(queue))
+
+    async def speak() -> None:
+        while manager.stats.stalls == 0:
+            await queue.put(LOUD)
+            await asyncio.sleep(0.01)
+
+    speaker = asyncio.create_task(speak())
+    await wait_until(lambda: manager.stats.stalls == 1)
+    await speaker
+    await wait_until(lambda: any(s.is_final and s.text == "Recovered." for s in recorder.segments))
+    await queue.put(None)
+    await asyncio.wait_for(task, 2)
+
+    assert manager.stats.sessions_opened == 2
+    assert silent.closed
+    assert any(
+        state is StageState.ROTATING and "stall" in (detail or "")
+        for state, detail in recorder.states
+    )
+    assert manager.stats.errors == 0  # a stall is not an engine error
+
+
+async def test_no_stall_without_speech_or_when_disabled() -> None:
+    for stall_seconds in (0.2, 0.0):
+        session = ScriptedSttSession([], hold_open=True)
+        recorder = Recorder()
+        queue: asyncio.Queue[bytes | None] = asyncio.Queue()
+        manager = managed(ScriptedSttEngine([session]), recorder, stall_seconds=stall_seconds)
+        task = asyncio.create_task(manager.run(queue))
+        for _ in range(40):
+            await queue.put(
+                CHUNK if stall_seconds else LOUD
+            )  # silence, or speech with the watchdog off
+            await asyncio.sleep(0.01)
+        await queue.put(None)
+        await asyncio.wait_for(task, 2)
+        assert manager.stats.stalls == 0 and manager.stats.sessions_opened == 1

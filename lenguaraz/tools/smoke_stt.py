@@ -183,6 +183,7 @@ async def run(
         emit=emit,
         on_state=on_state,
         rotate_seconds=float(rotate or settings.session_rotate_seconds),
+        stall_seconds=float(settings.stt_stall_seconds),
         vad_silence_ms=settings.vad_silence_ms if settings.vad_mode is VadMode.HYBRID else None,
         vad_threshold=settings.vad_threshold,
         drain_seconds=settings.rotation_drain_seconds,

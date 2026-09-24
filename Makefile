@@ -55,8 +55,8 @@ samples: ## Generate EN/ES test audio + sentence boundaries with Gemini TTS into
 mvp-check: ## Scripted check of every MVP gate (fake engine by default; MVP_ARGS="--engine gemini" for real)
 	$(UV) run lenguaraz mvp-check $(MVP_ARGS)
 
-license-check: ## Fail on any dependency license outside the allowlist (feature 007)
-	@echo "license-check: not implemented yet (feature 007)"; exit 1
+license-check: ## Inventory Python + npm dependency licenses, fail outside the allowlist, write THIRD_PARTY_LICENSES.md
+	$(UV) run python scripts/license_check.py --write
 
 spdx-check: ## Every source file starts with the SPDX header (Constitution Art. XVII.A.4)
 	@sh scripts/spdx_check.sh

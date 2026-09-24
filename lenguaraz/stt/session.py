@@ -62,6 +62,7 @@ class SessionStats:
     total_tokens: int = 0
     vad_signals: int = 0
     duplicates_dropped: int = 0
+    stalls: int = 0
     last_rotation_gap_ms: int | None = None
     last_detail: str | None = None
     states: list[StageState] = field(default_factory=list)
@@ -97,6 +98,7 @@ class ManagedSttSession:
         drain_seconds: float = 3.0,
         dedupe_window: float = 5.0,
         swap_max_wait: float = 8.0,
+        stall_seconds: float = 20.0,
         sleep: SleepFn = asyncio.sleep,
         clock: Callable[[], float] = time.monotonic,
         rng: Callable[[], float] = random.random,
@@ -114,6 +116,9 @@ class ManagedSttSession:
         self._drain_seconds = drain_seconds
         self._dedupe_window = dedupe_window
         self._swap_max_wait = swap_max_wait
+        self._stall_seconds = stall_seconds
+        self._last_speech_wall: float | None = None
+        self._last_caption_wall: float | None = None
         self._pending: SttSession | None = None
         self._watchdog_task: asyncio.Task[None] | None = None
         self._sleep = sleep
@@ -189,12 +194,20 @@ class ManagedSttSession:
                 assert receiver is not None
                 waiter = asyncio.create_task(self._rotate_requested.wait(), name="stt-rotate")
                 done, _ = await asyncio.wait(
-                    {sender, receiver, waiter}, return_when=asyncio.FIRST_COMPLETED
+                    {sender, receiver, waiter},
+                    timeout=self._stall_seconds / 4 if self._stall_seconds > 0 else None,
+                    return_when=asyncio.FIRST_COMPLETED,
                 )
                 if not waiter.done():
                     waiter.cancel()
                     with contextlib.suppress(asyncio.CancelledError):
                         await waiter
+
+                if not done:
+                    # periodic check: speech keeps flowing but the server sends nothing (spec 007)
+                    if self._stalled() and not await self._handle_stall():
+                        return
+                    continue
 
                 if sender in done:
                     error = sender.exception()
@@ -266,6 +279,7 @@ class ManagedSttSession:
         self._active = session
         self.session_id = getattr(session, "session_id", None)
         self._receiver_task = asyncio.create_task(self._receiver(session), name="stt-receiver")
+        self._last_caption_wall = self._clock()
         self._active_ready.set()
         self._failures = 0
         self._set_state(StageState.LIVE, None)
@@ -308,6 +322,31 @@ class ManagedSttSession:
         await asyncio.sleep(self._swap_max_wait)
         if self._pending is not None:
             self._swap(self._pending)
+
+    def _stalled(self) -> bool:
+        """True when speech was heard after the last caption and the window has expired."""
+        if self._stall_seconds <= 0 or self._active is None or self._pending is not None:
+            return False
+        speech, caption = self._last_speech_wall, self._last_caption_wall
+        if speech is None or caption is None or speech <= caption:
+            return False
+        now = self._clock()
+        return now - caption > self._stall_seconds and now - speech <= self._stall_seconds
+
+    async def _handle_stall(self) -> bool:
+        """Close the silent session and open a new one; counted separately from errors."""
+        self.stats.stalls += 1
+        old, receiver = self._active, self._receiver_task
+        self._active = None
+        self._active_ready.clear()
+        if receiver is not None and not receiver.done():
+            receiver.cancel()
+            with contextlib.suppress(asyncio.CancelledError, Exception):
+                await receiver
+        if old is not None:
+            await self._safe(old.close())
+        detail = f"no transcription for {self._stall_seconds:.0f}s while speech is flowing (stall)"
+        return await self._replace_dead_session(detail)
 
     async def _replace_dead_session(self, detail: str | None) -> bool:
         self._rotate_requested.clear()
@@ -437,9 +476,12 @@ class ManagedSttSession:
                 self._start_wall = self._clock()
             await session.send(chunk)
             self.stats.bytes_sent += len(chunk)
+            loud = chunk_rms(chunk) >= self._vad_threshold
+            if loud:
+                self._last_speech_wall = self._clock()
             if self._vad_silence_ms is None:
                 continue
-            if chunk_rms(chunk) >= self._vad_threshold:
+            if loud:
                 speech_seen = True
                 silence_ms = 0
             elif speech_seen:
@@ -514,6 +556,7 @@ class ManagedSttSession:
             latency_ms=self.latency_ms(),
             language=event.language_code,
         )
+        self._last_caption_wall = now
         if is_final:
             self._last_final_audio_ms = t_audio
             self._last_interim_wall = None

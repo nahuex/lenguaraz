@@ -61,3 +61,13 @@ docker compose pull && docker compose up -d --build   # picks up new stages.yaml
 ```
 
 Export transcripts first; a restart clears in-memory transcripts.
+
+## Stage shows `stalls` > 0
+
+**Symptom:** the Mangrullo table shows a non-zero `stalls` counter; the log has
+`no transcription for 20s while speech is flowing (stall)` followed by `ROTATING` → `LIVE`.
+
+**Meaning:** the transcription session stopped answering while audio kept flowing; the
+watchdog replaced it. One or two per hour is server-side variance and needs no action. Many
+per hour: check the audio level (`ffmpeg` volume, `VAD_THRESHOLD`), the Gemini status page
+and your project's concurrent-session quota; consider lowering `SESSION_ROTATE_SECONDS`.
