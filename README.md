@@ -26,13 +26,24 @@ understands it in their own language.
   (`IDLE · STARTING · LIVE · ROTATING · DEGRADED · STOPPED`) and automatic reconnection.
 - **Audience view (Fogón):** stage and language picker, font size, high contrast, dark mode,
   screen-reader friendly captions, reconnecting WebSocket.
+- **Live translation (Parla)** into any number of target languages with `gemini-3.5-flash-lite`:
+  streamed, glossary-aware, with the previous sentences as context; languages are translated
+  only while someone is listening (or listed in `ALWAYS_ON_LANGS`), and a translation failure
+  degrades to the source text instead of silence.
+- **Seamless session rotation (Posta):** the Live API closes a session after ~10 minutes; the
+  next one is opened before that, the switch happens at a pause, and finals are drained and
+  de-duplicated. Measured on the real engine: 0 lost, 0 duplicated sentences across forced
+  rotations.
+- **Operator panel (Mangrullo)** behind a Bearer token: stage table with state, latency and
+  cost estimate, start/stop, transcript export as **SRT / VTT / TXT** (Acta) per language.
+- **OBS overlay (Pizarrón):** a transparent browser-source page with `?lang=&lines=&size=`.
+- **Auto-glossary (Diccionario):** technical terms and proper names derived from the talk title
+  and abstract with Gemini structured output, merged after your manual list.
 - **Dry-run mode** (`ENGINE=fake`) that exercises the whole UI without credentials.
-- **Measured latency**, not claimed: `make smoke-stt` reports word error rate, first-partial and
+- **Measured, not claimed:** `make smoke-stt` reports word error rate, first-partial and
   utterance-to-final latency percentiles and token usage against bundled samples with known
-  sentence boundaries (`docs/metrics.md`).
-
-Translation fan-out, seamless session rotation, the operator panel, overlays and transcript
-export follow in the next features (see the backlog in `.specify/memory/product.md`).
+  sentence boundaries; `make simulate` runs ten stages in one process and writes a CPU/RSS/cost
+  report (`docs/metrics.md`, `docs/scale-report.md`, `docs/cost.md`).
 
 ## Quickstart (3 commands)
 
@@ -90,11 +101,13 @@ What grows with the number of stages is (1) CPU for ffmpeg decoding, roughly 2�
 per stream, (2) memory, a few tens of MB per stage, and (3) your Gemini project's limit on
 concurrent Live sessions, which is per project and tier and visible in Google AI Studio (the
 free tier allows only a handful; use a paid-tier project for real events). Beyond one machine,
-set `REDIS_URL` (feature 005) to run several workers that share the event bus, each owning a
-subset of the stages, behind any HTTP load balancer, because captions are plain WebSocket
-events. Cost grows with stages, not with stages × languages: one transcription stream per
-stage feeds every language as text. The scale report from `make simulate` (feature 005) and
-the sizing table in `docs/deploy/scaling.md` (feature 008) put measured numbers on this.
+run several instances, each with its own `stages.yaml` subset, behind any HTTP load balancer
+or hostname per instance: stages never share state, and captions are plain WebSocket events
+(a shared Redis bus was planned and cut from the hackathon scope; see `docs/decisions.md`).
+Cost grows with stages, not with stages × languages: one transcription stream per stage feeds
+every language as text. The scale report from `make simulate` (`docs/scale-report.md`: ten
+stages, two real and eight simulated, ≈10 % of one core and +18 MB RSS) and the sizing table
+in `docs/deploy/scaling.md` put measured numbers on this.
 
 ## Technical glossary & proper names
 
@@ -102,9 +115,11 @@ Talks are full of terms that generic speech recognition mangles ("eBPF", "CoreDN
 and product names). Each stage carries a `glossary` list in `stages.yaml`; Lenguaraz sends it
 to the transcription model as `custom_vocabulary` (biasing recognition toward those terms) and
 inserts it, clearly delimited, into every translation prompt with the instruction to keep
-those terms verbatim. `make smoke-stt` and `make smoke-translate` report how often the
-glossary terms come out right. Feature 006 builds the list automatically from the talk title
-and abstract.
+those terms verbatim. With `AUTO_GLOSSARY=true` (default) the list is extended automatically
+from the talk `title` and `abstract` (Gemini structured JSON output; manual terms always win;
+100 terms max). `make smoke-stt --glossary none|manual|auto` and `make smoke-translate` report
+how often the glossary terms come out right; on the bundled Spanish sample the glossary turned
+"task group" into `TaskGroup` and "nerdctl" into `Nerdearla` (`docs/metrics.md`).
 
 ## Test audio
 

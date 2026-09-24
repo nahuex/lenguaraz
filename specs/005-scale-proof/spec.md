@@ -1,6 +1,6 @@
 # Spec 005 — scale-proof
 
-**Status:** Approved · **Owner:** human · **Author:** agent · **Created:** 2026-09-24T21:33Z
+**Status:** Shipped (H3 pending) · **Owner:** human · **Author:** agent · **Created:** 2026-09-24T21:33Z
 **Constitution:** v1.0.0 · **Backlog row:** product.md §6 #005 (RedisBus half cut by the ladder)
 
 ## 1. Why

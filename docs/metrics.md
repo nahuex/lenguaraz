@@ -25,6 +25,14 @@ Measured by the project's own tooling (Constitution Art. V.2); definitions below
 | Date (UTC) | Sample | Mode | Finals | WER | First partial p50/p95 ms | Utterance-to-final p50/p95 ms | Commit delay p50/p95 ms | Tokens (in/out) | Est. cost USD |
 |---|---|---|---|---|---|---|---|---|---|
 | 2026-09-24 17:09 | es_asyncio.wav | SMART | 7 | 4.3% | 2809/14823 | 3981/15932 | 156/391 | 0/0 | 0.0072 |
+| 2026-09-24 17:27 | es_asyncio.wav | SMART | 7 | 4.3% | 2359/5044 | 777/981 | 469/1234 | 0/0 | 0.0072 |
+| 2026-09-24 21:52 | en_kubernetes.wav | SMART · glossary=none | 3 | 13.7% | 27194/31155 | 28085/32140 | 0/79 | 0/0 | 0.0057 |
+| 2026-09-24 21:53 | en_kubernetes.wav | SMART · glossary=manual (9) | 7 | 3.2% | 897/1265 | 904/1051 | 297/485 | 0/0 | 0.0059 |
+| 2026-09-24 21:53 | en_kubernetes.wav | SMART · glossary=auto (+0) | 7 | 3.2% | 1405/2016 | 1001/1083 | 0/1375 | 0/0 | 0.0059 |
+| 2026-09-24 21:54 | en_kubernetes.wav | SMART · glossary=none | 3 | 60.0% | 1592/2250 | 1037/1077 | 297/437 | 0/0 | 0.0042 |
+| 2026-09-24 21:55 | es_asyncio.wav | SMART · glossary=auto (+2) | 7 | 4.3% | 1151/1151 | 715/746 | 0/422 | 0/0 | 0.0072 |
+| 2026-09-24 21:56 | es_asyncio.wav | SMART · glossary=none | 7 | 7.6% | 1042/1562 | 848/936 | 407/516 | 0/0 | 0.0072 |
+| 2026-09-24 21:59 | en_kubernetes.wav | SMART · glossary=none | 7 | 3.2% | 1025/1782 | 923/1069 | 219/453 | 0/0 | 0.0059 |
 
 ### Notes
 
@@ -43,7 +51,21 @@ Measured by the project's own tooling (Constitution Art. V.2); definitions below
   `docs/decisions.md` D-001-3/D-001-4.
 - The Live transcription session sent no `usage_metadata`; cost is estimated from audio
   seconds (25 tokens/s) plus response characters ÷ 4.
-| 2026-09-24 17:27 | es_asyncio.wav | SMART | 7 | 4.3% | 2359/5044 | 777/981 | 469/1234 | 0/0 | 0.0072 |
+- **Glossary evidence (2026-09-24 21:52–21:59Z, `smoke-stt --glossary none|manual|auto`,
+  spec 006 AC-5):** on the Spanish sample the glossary is what turns "task group" into
+  `TaskGroup` and "nerdctl" into `Nerdearla` (WER 7.6 % without, 4.3 % with; the remaining
+  errors are punctuation/number formatting). On the English sample the model already spells
+  `eBPF`, `Cilium`, `CoreDNS` and `OpenTelemetry` correctly without help (WER 3.2 % in the
+  clean run with and without the glossary), so the glossary matters most for names the model
+  has never seen. `--glossary auto` asked Diccionario (Gemini structured output) for terms from
+  the talk title/abstract: +0 for the English stage (every term was already in the manual
+  list) and +2 for the Spanish stage (`Python`, `Gemini Live`), with no WER change.
+- **Two anomalous no-glossary rows (21:52 and 21:54)** are server-side variance, not the
+  glossary: in the first the server finalized only at stream end (3 merged finals, the tail
+  truncated), in the second it stopped emitting after the third sentence with no error and
+  the session still open (WER 60 % = four missing sentences). The same configuration passed
+  7/7 at 21:59. Rows are kept as measured; the risk (a silent stall mid-stream, seen 1 in
+  ~15 runs today) is tracked in `STATE.md`.
 
 ## smoke-translate runs
 

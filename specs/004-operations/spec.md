@@ -1,6 +1,6 @@
 # Spec 004 — operations
 
-**Status:** Approved · **Owner:** human · **Author:** agent · **Created:** 2026-09-24T21:26Z
+**Status:** Shipped · **Owner:** human · **Author:** agent · **Created:** 2026-09-24T21:26Z
 **Constitution:** v1.0.0 · **Backlog row:** product.md §6 #004
 
 ## 1. Why

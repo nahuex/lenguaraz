@@ -1,6 +1,6 @@
 # Spec 006 — auto-glossary
 
-**Status:** Approved · **Owner:** human · **Author:** agent · **Created:** 2026-09-24T21:45Z
+**Status:** Shipped · **Owner:** human · **Author:** agent · **Created:** 2026-09-24T21:45Z
 **Constitution:** v1.0.0 · **Backlog row:** product.md §6 #006
 
 ## 1. Why
@@ -46,3 +46,5 @@ Editing the glossary from the UI (ladder cut); learning terms from the transcrip
 
 ## Changelog
 - 2026-09-24T21:45Z created; Status Approved.
+- 2026-09-24T22:02Z Shipped: AC-1..4 by tests, AC-5 measured (docs/metrics.md); the heuristic
+  ignores sentence-initial capitalized words (title case is not a name), documented in D-006-1.

@@ -22,11 +22,13 @@ from pathlib import Path
 from lenguaraz.config import (
     ConfigError,
     EngineKind,
+    Settings,
     StageConfig,
     StagesFile,
     VadMode,
     load_settings,
 )
+from lenguaraz.glossary.auto import GeminiAutoGlossary, merge_glossary
 from lenguaraz.ingest import open_source
 from lenguaraz.logsetup import configure_logging
 from lenguaraz.metrics import percentile
@@ -139,11 +141,14 @@ async def run(
     mode: str | None,
     verbose: bool = False,
     rotate: int | None = None,
+    glossary: str = "manual",
 ) -> int:
     settings = load_settings(**({"stt_mode": mode} if mode else {}))
     if settings.engine is not EngineKind.GEMINI:
         raise ConfigError("smoke-stt needs ENGINE=gemini and a GEMINI_API_KEY in .env")
     configure_logging(settings.log_level)
+    stage, glossary_label = await apply_glossary_option(stage, glossary, settings)
+    print(f"glossary: {glossary_label} -> {stage.glossary}")
     reference = read_reference(sample)
     boundaries = read_boundaries(sample)
 
@@ -217,6 +222,7 @@ async def run(
 
     print("\n=== smoke-stt summary ===")
     print(f"sample: {sample}  mode: {settings.stt_mode.value}  model: {settings.gemini_stt_model}")
+    print(f"glossary: {glossary_label}")
     print(f"finals: {len(finals)}  interims: {len(interims)}  sessions: {stats.sessions_opened}")
     print(f"errors: {stats.errors}  rotations: {stats.rotations}  vad_signals: {stats.vad_signals}")
     if rotate:
@@ -251,7 +257,7 @@ async def run(
     print(f"audio: {audio_seconds:.1f} s  estimated cost: ${cost:.4f}{estimated}")
     append_metrics_row(
         sample=sample,
-        mode=settings.stt_mode.value,
+        mode=f"{settings.stt_mode.value} · glossary={glossary_label}",
         finals=len(finals),
         wer=wer,
         first=first,
@@ -288,8 +294,31 @@ def append_metrics_row(
         f"{fmt_p(utt)} | {fmt_p(final_lat)} | {prompt_tokens}/{response_tokens} | "
         f"{cost:.4f} |\n"
     )
-    with METRICS_FILE.open("a", encoding="utf-8") as handle:
-        handle.write(row)
+    lines = METRICS_FILE.read_text(encoding="utf-8").splitlines(keepends=True)
+    header = METRICS_HEADER.splitlines()[0].strip()
+    insert_at = len(lines)
+    for index, line in enumerate(lines):
+        if line.strip() == header:
+            insert_at = index + 1
+            while insert_at < len(lines) and lines[insert_at].startswith("|"):
+                insert_at += 1
+            break
+    lines.insert(insert_at, row)
+    METRICS_FILE.write_text("".join(lines), encoding="utf-8")
+
+
+async def apply_glossary_option(
+    stage: StageConfig, option: str, settings: Settings
+) -> tuple[StageConfig, str]:
+    """none → empty list; manual → stages.yaml list; auto → manual + Diccionario suggestions."""
+    if option == "none":
+        return stage.model_copy(update={"glossary": []}), "none"
+    if option == "auto":
+        terms = await GeminiAutoGlossary(settings).suggest(stage)
+        merged = merge_glossary(stage.glossary, terms)
+        added = len(merged) - len(stage.glossary)
+        return stage.model_copy(update={"glossary": merged}), f"auto (+{added})"
+    return stage, f"manual ({len(stage.glossary)})"
 
 
 def pick_stage(sample: Path, stage_id: str | None) -> StageConfig:
@@ -314,6 +343,12 @@ def main(argv: Sequence[str] | None = None) -> int:
     parser.add_argument(
         "--rotate", type=int, default=None, help="force a session rotation every N seconds"
     )
+    parser.add_argument(
+        "--glossary",
+        choices=["manual", "none", "auto"],
+        default="manual",
+        help="custom_vocabulary: the stage list (manual), nothing, or manual + auto-glossary",
+    )
     args = parser.parse_args(argv)
     sample = Path(args.sample)
     if not sample.is_file():
@@ -321,7 +356,14 @@ def main(argv: Sequence[str] | None = None) -> int:
         return 2
     try:
         return asyncio.run(
-            run(sample, pick_stage(sample, args.stage), args.mode, args.verbose, args.rotate)
+            run(
+                sample,
+                pick_stage(sample, args.stage),
+                args.mode,
+                args.verbose,
+                args.rotate,
+                args.glossary,
+            )
         )
     except ConfigError as exc:
         print(f"configuration error: {exc}", file=sys.stderr)
