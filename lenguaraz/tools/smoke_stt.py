@@ -2,8 +2,9 @@
 """``make smoke-stt``: transcribe a bundled sample with the real Gemini engine.
 
 Uses quota (Constitution Art. XII.2: never in the test suite). Prints the finals, the word
-error rate against the reference transcript, interim and final latency percentiles and the
-token usage, then appends a dated row to ``docs/metrics.md``.
+error rate against the reference transcript, speech-to-caption latency percentiles measured
+against the sample's sentence boundaries, token usage and an estimated cost, then appends a
+dated row to ``docs/metrics.md``.
 """
 
 from __future__ import annotations
@@ -29,18 +30,19 @@ from lenguaraz.stt.session import ManagedSttSession, Segment
 METRICS_FILE = Path("docs/metrics.md")
 METRICS_INTRO = (
     "# Metrics\n\n"
-    "Measured by the project's own tooling (Constitution Art. V.2). `latency_ms` = caption "
-    "publish time minus the audio-timeline position of the newest chunk already sent. "
-    "Utterance-to-final = wall time of the final minus the wall time at which the sentence "
-    "ended in the audio (from the sample's sentence boundaries).\n\n"
-    "## smoke-stt runs\n\n"
+    "Measured by the project's own tooling (Constitution Art. V.2); definitions in this file."
+    "\n\n## smoke-stt runs\n\n"
 )
 METRICS_HEADER = (
-    "| Date (UTC) | Sample | Mode | Finals | WER | Interim p50/p95 ms | Final p50/p95 ms | "
-    "Utterance-to-final p50/p95 ms | Tokens (in/out) |\n"
-    "|---|---|---|---|---|---|---|---|---|\n"
+    "| Date (UTC) | Sample | Mode | Finals | WER | First partial p50/p95 ms | "
+    "Utterance-to-final p50/p95 ms | Commit delay p50/p95 ms | Tokens (in/out) | "
+    "Est. cost USD |\n"
+    "|---|---|---|---|---|---|---|---|---|---|\n"
 )
 WER_LIMIT = 0.25
+AUDIO_TOKENS_PER_SECOND = 25  # GT-6.1
+PRICE_IN_PER_M = 3.50  # USD per 1M audio tokens (GT-6.1, pricing read 2026-09-22)
+PRICE_OUT_PER_M = 21.0  # USD per 1M text tokens
 
 
 def normalize(text: str) -> list[str]:
@@ -73,12 +75,35 @@ def _levenshtein(a: list[str], b: list[str]) -> int:
 def utterance_latencies(
     boundaries: list[dict[str, float]], finals: list[tuple[float, Segment]], start_wall: float
 ) -> list[int]:
-    """Match finals to sentence boundaries in order: wall(final) - wall(sentence end)."""
+    """Sentence end → final caption, matching finals to boundaries in order."""
     out: list[int] = []
     for boundary, (wall, _segment) in zip(boundaries, finals, strict=False):
         end_wall = start_wall + boundary["end_ms"] / 1000.0
         out.append(max(0, round((wall - end_wall) * 1000)))
     return out
+
+
+def first_partial_latencies(
+    boundaries: list[dict[str, float]],
+    finals: list[tuple[float, Segment]],
+    interims: list[tuple[float, Segment]],
+    start_wall: float,
+) -> list[int]:
+    """Sentence start → first partial caption of the utterance that ends with final k."""
+    out: list[int] = []
+    for boundary, (_wall, final) in zip(boundaries, finals, strict=False):
+        firsts = [wall for wall, seg in interims if seg.seq == final.seq]
+        if not firsts:
+            continue
+        start = start_wall + boundary["start_ms"] / 1000.0
+        out.append(max(0, round((min(firsts) - start) * 1000)))
+    return out
+
+
+def estimate_cost(audio_seconds: float, response_tokens: int, hypothesis: str) -> float:
+    tokens_out = response_tokens or len(hypothesis) / 4
+    audio_cost = audio_seconds * AUDIO_TOKENS_PER_SECOND / 1e6 * PRICE_IN_PER_M
+    return audio_cost + tokens_out / 1e6 * PRICE_OUT_PER_M
 
 
 def read_reference(sample: Path) -> str:
@@ -98,10 +123,10 @@ def read_boundaries(sample: Path) -> list[dict[str, float]]:
 
 
 def fmt_p(values: list[int]) -> str:
-    return f"{percentile(values, 50)}/{percentile(values, 95)}"
+    return f"{percentile(values, 50)}/{percentile(values, 95)}" if values else "n/a"
 
 
-async def run(sample: Path, stage: StageConfig, mode: str | None) -> int:
+async def run(sample: Path, stage: StageConfig, mode: str | None, verbose: bool = False) -> int:
     settings = load_settings(**({"stt_mode": mode} if mode else {}))
     if settings.engine is not EngineKind.GEMINI:
         raise ConfigError("smoke-stt needs ENGINE=gemini and a GEMINI_API_KEY in .env")
@@ -119,10 +144,10 @@ async def run(sample: Path, stage: StageConfig, mode: str | None) -> int:
         stamp = f"{segment.t_audio_ms / 1000:6.1f}s +{segment.latency_ms:4d}ms"
         if segment.is_final:
             finals.append((now, segment))
-            print(f"[final   {stamp}] {segment.text}")
+            print(f"\n[final   {stamp}] {segment.text}")
         else:
             interims.append((now, segment))
-            print(f"[interim {stamp}] {segment.text[-70:]}", end="\r")
+            print(f"[interim {stamp}] {segment.text[-70:]}", end="\n" if verbose else "\r")
 
     def on_state(state: StageState, detail: str | None) -> None:
         print(f"\n[state] {state.value} {detail or ''}")
@@ -147,33 +172,39 @@ async def run(sample: Path, stage: StageConfig, mode: str | None) -> int:
 
     hypothesis = " ".join(segment.text for _, segment in finals)
     wer = word_error_rate(reference, hypothesis) if reference else float("nan")
-    interim_lat = [s.latency_ms for _, s in interims]
     final_lat = [s.latency_ms for _, s in finals]
-    utt = utterance_latencies(boundaries, finals, session.stream_start or start_wall)
+    stream_start = session.stream_start or start_wall
+    utt = utterance_latencies(boundaries, finals, stream_start)
+    first = first_partial_latencies(boundaries, finals, interims, stream_start)
     stats = session.stats
+    audio_seconds = stats.bytes_sent / 32_000
+    cost = estimate_cost(audio_seconds, stats.response_tokens, hypothesis)
 
     print("\n=== smoke-stt summary ===")
     print(f"sample: {sample}  mode: {settings.stt_mode.value}  model: {settings.gemini_stt_model}")
     print(f"finals: {len(finals)}  interims: {len(interims)}  sessions: {stats.sessions_opened}")
     print(f"errors: {stats.errors}  rotations: {stats.rotations}")
     print(f"WER vs reference: {wer:.1%}" if reference else "WER: no reference transcript")
-    print(f"interim latency p50/p95: {fmt_p(interim_lat)} ms")
-    print(f"final latency p50/p95:   {fmt_p(final_lat)} ms")
-    if utt:
+    if boundaries:
+        print(f"first partial after sentence start p50/p95: {fmt_p(first)} ms")
         print(f"utterance-to-final p50/p95: {fmt_p(utt)} ms ({len(utt)} sentences)")
     else:
-        print("utterance-to-final: no sentence boundaries (.json) next to the sample")
+        print("speech-to-caption latency: no sentence boundaries (.json) next to the sample")
+    print(f"commit delay (last partial -> final) p50/p95: {fmt_p(final_lat)} ms")
     print(f"tokens: prompt={stats.prompt_tokens} response={stats.response_tokens}")
+    estimated = " (estimated: no usage_metadata received)" if not stats.response_tokens else ""
+    print(f"audio: {audio_seconds:.1f} s  estimated cost: ${cost:.4f}{estimated}")
     append_metrics_row(
         sample=sample,
         mode=settings.stt_mode.value,
         finals=len(finals),
         wer=wer,
-        interim_lat=interim_lat,
-        final_lat=final_lat,
+        first=first,
         utt=utt,
+        final_lat=final_lat,
         prompt_tokens=stats.prompt_tokens,
         response_tokens=stats.response_tokens,
+        cost=cost,
     )
     ok = len(finals) > 0 and (not reference or wer <= WER_LIMIT)
     print("RESULT:", "PASS" if ok else f"FAIL (need >= 1 final and WER <= {WER_LIMIT:.0%})")
@@ -186,20 +217,21 @@ def append_metrics_row(
     mode: str,
     finals: int,
     wer: float,
-    interim_lat: list[int],
-    final_lat: list[int],
+    first: list[int],
     utt: list[int],
+    final_lat: list[int],
     prompt_tokens: int,
     response_tokens: int,
+    cost: float,
 ) -> None:
     METRICS_FILE.parent.mkdir(parents=True, exist_ok=True)
     if not METRICS_FILE.is_file():
         METRICS_FILE.write_text(METRICS_INTRO + METRICS_HEADER, encoding="utf-8")
     stamp = datetime.now(tz=UTC).strftime("%Y-%m-%d %H:%M")
-    utt_col = fmt_p(utt) if utt else "n/a"
     row = (
-        f"| {stamp} | {sample.name} | {mode} | {finals} | {wer:.1%} | {fmt_p(interim_lat)} | "
-        f"{fmt_p(final_lat)} | {utt_col} | {prompt_tokens}/{response_tokens} |\n"
+        f"| {stamp} | {sample.name} | {mode} | {finals} | {wer:.1%} | {fmt_p(first)} | "
+        f"{fmt_p(utt)} | {fmt_p(final_lat)} | {prompt_tokens}/{response_tokens} | "
+        f"{cost:.4f} |\n"
     )
     with METRICS_FILE.open("a", encoding="utf-8") as handle:
         handle.write(row)
@@ -223,13 +255,14 @@ def main(argv: Sequence[str] | None = None) -> int:
     parser.add_argument("--sample", default="samples/en_kubernetes.wav")
     parser.add_argument("--stage", default=None, help="stage id from stages.yaml")
     parser.add_argument("--mode", choices=["SMART", "VERBATIM"], default=None)
+    parser.add_argument("--verbose", action="store_true", help="print every partial")
     args = parser.parse_args(argv)
     sample = Path(args.sample)
     if not sample.is_file():
         print(f"sample not found: {sample}", file=sys.stderr)
         return 2
     try:
-        return asyncio.run(run(sample, pick_stage(sample, args.stage), args.mode))
+        return asyncio.run(run(sample, pick_stage(sample, args.stage), args.mode, args.verbose))
     except ConfigError as exc:
         print(f"configuration error: {exc}", file=sys.stderr)
         return 2

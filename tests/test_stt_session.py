@@ -205,21 +205,28 @@ async def test_rotation_timer_reopens_the_session() -> None:
     assert [s.text for s in recorder.segments] == ["after timer"]
 
 
-async def test_latency_uses_the_audio_timeline() -> None:
-    now = [100.0]
+async def test_latency_is_update_gap_for_interims_and_commit_delay_for_finals() -> None:
+    session = ScriptedSttSession(
+        [
+            (0.0, SttEvent.interim("we")),
+            (0.10, SttEvent.interim("we are")),
+            (0.15, SttEvent.final("We are here.")),
+            (0.05, SttEvent.final("No partial before me.")),
+        ],
+        hold_open=True,
+    )
     recorder = Recorder()
-    session = ScriptedSttSession([], hold_open=True)
-    manager = managed(ScriptedSttEngine([session]), recorder, clock=lambda: now[0])
     queue: asyncio.Queue[bytes | None] = asyncio.Queue()
+    manager = managed(ScriptedSttEngine([session]), recorder)
     task = asyncio.create_task(manager.run(queue))
-    await queue.put(CHUNK)
-    await queue.put(CHUNK)
-    await asyncio.sleep(0.02)
-    now[0] = 100.0 + 0.2 + 0.35  # 200 ms of audio sent, 550 ms elapsed → 350 ms lag
-    assert manager.t_audio_ms() == 200
-    assert manager.latency_ms() == 350
+    await asyncio.sleep(0.45)
     await queue.put(None)
     await asyncio.wait_for(task, 2)
+    first, second, final, lonely = recorder.segments
+    assert first.latency_ms == 0  # first partial of the utterance
+    assert 60 <= second.latency_ms <= 250  # ~100 ms since the previous partial
+    assert 100 <= final.latency_ms <= 300  # ~150 ms commit delay after the last partial
+    assert lonely.latency_ms == 0  # a final with no partial has no commit delay to report
 
 
 async def test_fake_session_paces_on_audio_and_reads_reference_text(tmp_path) -> None:  # type: ignore[no-untyped-def]

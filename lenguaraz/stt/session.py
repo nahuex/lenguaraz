@@ -89,6 +89,7 @@ class ManagedSttSession:
         self.session_id: str | None = None
         self._seq = 0
         self._start_wall: float | None = None
+        self._last_interim_wall: float | None = None
 
     # -- state -------------------------------------------------------------------------
 
@@ -109,10 +110,16 @@ class ManagedSttSession:
         return self.stats.bytes_sent // BYTES_PER_MS
 
     def latency_ms(self) -> int:
-        if self._start_wall is None:
+        """Milliseconds since the previous partial update of the current utterance.
+
+        For an interim this is the update gap; for a final it is the commit delay (last
+        partial update → committed line). 0 when there is no previous partial. True
+        speech-to-caption latency is measured by ``make smoke-stt`` with known sentence
+        boundaries (spec 001 FR-001-13, amended 2026-09-24).
+        """
+        if self._last_interim_wall is None:
             return 0
-        elapsed_ms = (self._clock() - self._start_wall) * 1000.0
-        return max(0, round(elapsed_ms - self.t_audio_ms()))
+        return max(0, round((self._clock() - self._last_interim_wall) * 1000.0))
 
     def _backoff(self, attempt: int) -> float:
         base = min(self._backoff_cap, self._backoff_base * (2 ** (attempt - 1)))
@@ -251,7 +258,7 @@ class ManagedSttSession:
         return "rotate", "session closed by server"
 
     def _segment(self, event: SttEvent, *, is_final: bool) -> Segment:
-        return Segment(
+        segment = Segment(
             seq=self._seq,
             text=event.text.strip(),
             is_final=is_final,
@@ -259,6 +266,8 @@ class ManagedSttSession:
             latency_ms=self.latency_ms(),
             language=event.language_code,
         )
+        self._last_interim_wall = None if is_final else self._clock()
+        return segment
 
     @staticmethod
     async def _safe(awaitable: Awaitable[None]) -> None:

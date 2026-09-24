@@ -22,15 +22,18 @@ def build_parser() -> argparse.ArgumentParser:
     serve.add_argument("--port", type=int, default=None)
     serve.add_argument("--reload", action="store_true", help="auto-reload on code changes")
 
-    sub.add_parser("samples", help="generate test audio with Gemini TTS (uses quota)")
-    sub.add_parser("smoke-stt", help="transcribe a sample with the real engine (uses quota)")
-    sub.add_parser("mvp-check", help="scripted check of the MVP gates")
+    for name, help_text in (
+        ("samples", "generate test audio with Gemini TTS (uses quota)"),
+        ("smoke-stt", "transcribe a sample with the real engine (uses quota)"),
+        ("mvp-check", "scripted check of the MVP gates"),
+    ):
+        sub.add_parser(name, help=help_text, add_help=False)  # tool parses its own options
     return parser
 
 
 def main(argv: Sequence[str] | None = None) -> int:
     parser = build_parser()
-    args = parser.parse_args(argv)
+    args, extra = parser.parse_known_args(argv)
     command = args.command or "serve"
     try:
         if command == "serve":
@@ -38,15 +41,15 @@ def main(argv: Sequence[str] | None = None) -> int:
         if command == "samples":
             from lenguaraz.tools.samples import main as samples_main
 
-            return samples_main()
+            return samples_main(extra)
         if command == "smoke-stt":
             from lenguaraz.tools.smoke_stt import main as smoke_main
 
-            return smoke_main()
+            return smoke_main(extra)
         if command == "mvp-check":
             from lenguaraz.tools.mvp_check import main as mvp_main
 
-            return mvp_main()
+            return mvp_main(extra)
     except ConfigError as exc:
         print(f"configuration error: {exc}", file=sys.stderr)
         return 2
