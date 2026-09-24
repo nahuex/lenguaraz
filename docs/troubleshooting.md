@@ -21,5 +21,7 @@ Symptom → cause → fix. Every stage state and detail is visible on the home p
 | Translation is right but slow (several seconds) | `GEMINI_TRANSLATE_THINKING` set above `minimal`, or long segments | Use `minimal`; keep `PROGRESSIVE_TRANSLATION=true` so a provisional line appears while the sentence is spoken |
 | WebSocket closes with `4429` | Too many caption sockets from one IP (`WS_MAX_CONN_PER_IP`) — typical behind a venue NAT | Raise `WS_MAX_CONN_PER_IP` |
 | WebSocket closes with `4413` | The client could not keep up; the server never drops final captions, so it closed the socket | The client reconnects automatically; check the network of that device |
+| `/api/admin/*` answers `401` | Missing or wrong `Authorization: Bearer <ADMIN_TOKEN>` header | Copy the token from `.env`; the Mangrullo page keeps it in session storage only |
+| Export answers `404` with `available: [...]` | That stage produced no final caption in the requested language yet (language not active or no listener) | Pick a listed language, or add it to `ALWAYS_ON_LANGS` so it is always produced |
 | Home page says "audience view is not built yet" | Developer path without `make web` | `make web`; the Docker image builds it automatically |
 | `make smoke-stt` reports a high WER on the bundled sample | SMART mode formats numbers ("300" for "three hundred") which the reference spells out; or the audio is broken | Compare the finals by eye; regenerate samples with `make samples`; use `--mode VERBATIM` to compare |

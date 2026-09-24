@@ -35,7 +35,10 @@ stages.yaml + .env ──▶ config (pydantic)
 | Fogón | `web/src/pages/Fogon.tsx` | Audience view: stage + language, font size, contrast, dark mode, `aria-live` captions, reconnecting socket. |
 | Parla | `lenguaraz/translate/fanout.py` | One ordered worker per (stage, language): every final caption is translated with the stage glossary and the last segments as context (Interactions API, `thinking_level: minimal`); retries with backoff; on persistent failure the caption is published with `degraded: true` and the original text. Progressive translation publishes a provisional line from a debounced partial. |
 | Baqueano | `lenguaraz/translate/demand.py` | Active languages = `ALWAYS_ON_LANGS` plus languages with a listener in the last `LANG_GRACE_SECONDS`, restricted to the stage's `targets`; evaluated at every caption. |
-| Acta, Mangrullo, Pizarrón, Diccionario | features 004–006 | Export, admin, overlay, auto-glossary. |
+| Acta | `lenguaraz/export.py` | Bounded in-memory transcript per stage and language (start = first partial, end = final, on the audio timeline), fed from the bus; `GET /api/admin/stages/{id}/export?format=srt\|vtt\|txt&lang=` renders it. Nothing touches disk until an operator exports. |
+| Mangrullo | `lenguaraz/api/admin.py`, `web/src/pages/Mangrullo.tsx` | Operator API and page behind `ADMIN_TOKEN` (Bearer, constant-time compare): stage snapshots with latency, rotations, errors, duplicates, dropped chunks, token usage and estimated cost; start/stop; exports. |
+| Pizarrón | `web/src/pages/Pizarron.tsx` | Transparent overlay for OBS/vMix browser sources: `/pizarron/{stage}?lang=&lines=2&size=l&align=bottom&bg=band`. |
+| Diccionario | feature 006 | Auto-glossary from talk title and abstract. |
 
 ## Stage states
 
@@ -72,7 +75,10 @@ The first message is always a `status` event. Then, one JSON object per message:
 |---|---|
 | `GET /healthz` | `{"status":"ok","engine":"gemini|fake","stages":N,"version":"…"}` |
 | `GET /api/stages` | One row per stage: `id`, `name`, `state`, `detail`, `source_lang`, `targets`, `languages`, `listeners`, `dry_run`, `session_id`, `rotations`, `errors`, `captions_final`, `p50_ms`, `p95_ms`, `interim_p95_ms` |
-| `GET /` , `/fogon/{stage}` | The audience view (single-page app) |
+| `GET /` , `/fogon/{stage}`, `/pizarron/{stage}`, `/mangrullo` | The single-page app: home, audience view, overlay, operations |
+| `GET /api/admin/stages` (Bearer) | Snapshots plus `running`, `audio_seconds`, `est_cost_usd`, `transcript_entries` |
+| `POST /api/admin/stages/{id}/start` · `/stop` (Bearer) | Start or stop a stage runner |
+| `GET /api/admin/stages/{id}/export?format=srt\|vtt\|txt&lang=` (Bearer) | Transcript download (`Content-Disposition: attachment`) |
 
 ## Deployment shape
 

@@ -42,5 +42,17 @@ They are capped and delimited like the glossary.
 The audience view ships with a neutral dark theme, a light theme and a high-contrast theme
 (WCAG 2.1 AA), font-size control and a "show original" toggle; every preference is stored in
 the visitor's browser. Event branding (name, colors, logo) is runtime configuration
-(`branding.yaml`, feature 004/008); logos are never committed to the repository. The OBS/vMix
-overlay (Pizarrón, feature 004) takes `?lang=` and `?lines=` parameters.
+(`branding.yaml`, feature 008); logos are never committed to the repository.
+
+## OBS / vMix overlay (Pizarrón)
+
+Add a **Browser Source** pointing at `http://<host>:8000/pizarron/<stage>?lang=es&lines=2`
+with the canvas size of your scene; the page background is transparent. Parameters:
+
+| Parameter | Values | Default | Meaning |
+|---|---|---|---|
+| `lang` | short code | first source language | Caption language |
+| `lines` | 1–5 | `2` | Final lines kept on screen (plus the current partial) |
+| `size` | `s` `m` `l` `xl` | `l` | Font size (28/40/56/72 px at 1080p) |
+| `align` | `bottom` `top` | `bottom` | Where the block sits |
+| `bg` | `band` `none` | `band` | Semi-transparent band behind the text, or nothing |

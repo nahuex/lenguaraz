@@ -14,6 +14,7 @@ from fastapi.responses import FileResponse, HTMLResponse, JSONResponse
 from fastapi.staticfiles import StaticFiles
 
 from lenguaraz import __version__
+from lenguaraz.api.admin import router as admin_router
 from lenguaraz.api.ws import ConnectionLimiter, caption_socket
 from lenguaraz.bus.base import Bus
 from lenguaraz.bus.memory import MemoryBus
@@ -98,6 +99,8 @@ def create_app(
         websocket: WebSocket, stage_id: str, lang: str | None = Query(default=None)
     ) -> None:
         await caption_socket(websocket, stage_id, lang, limiter=limiter)
+
+    app.include_router(admin_router)
 
     index = dist / "index.html"
     if (dist / "assets").is_dir():

@@ -16,10 +16,12 @@ from typing import Any
 
 from lenguaraz.bus.base import Bus
 from lenguaraz.config import Settings, StageConfig, StagesFile, VadMode, short_code
+from lenguaraz.export import TranscriptStore
 from lenguaraz.ingest import AudioSource, IngestError, open_source
 from lenguaraz.ingest.base import is_local_file
 from lenguaraz.metrics import StageMetrics
 from lenguaraz.models import CaptionEvent, MetricsEvent, StageState, StatusEvent
+from lenguaraz.pricing import estimate_stage_cost
 from lenguaraz.stt.base import SttEngine
 from lenguaraz.stt.session import ManagedSttSession, Segment
 from lenguaraz.translate.base import TranslationEngine
@@ -59,6 +61,9 @@ class StageRunner:
         self._source_error: str | None = None
         self._live_once = asyncio.Event()
         self.chunks_dropped = 0
+        self.transcript = TranscriptStore()
+        self._recorder: asyncio.Task[None] | None = None
+        self._caption_chars = 0
         self._log = logging.LoggerAdapter(log, {"stage_id": stage.id, "component": "Oído/Lengua"})
 
     # -- lifecycle ----------------------------------------------------------------------
@@ -66,7 +71,13 @@ class StageRunner:
     async def start(self) -> None:
         if self._task is not None and not self._task.done():
             return
+        if self._recorder is None or self._recorder.done():
+            subscription = self._bus.subscribe(self.stage.id, internal=True)
+            self._recorder = asyncio.create_task(
+                self._record(subscription), name=f"acta-{self.stage.id}"
+            )
         self._source_error = None
+        self._live_once = asyncio.Event()
         self._task = asyncio.create_task(self._run(), name=f"stage-{self.stage.id}")
 
     async def stop(self) -> None:
@@ -84,6 +95,27 @@ class StageRunner:
     @property
     def running(self) -> bool:
         return self._task is not None and not self._task.done()
+
+    async def _record(self, subscription: Any) -> None:
+        """Acta: keep every final caption (all languages) for export."""
+        try:
+            async for event in subscription:
+                if isinstance(event, CaptionEvent):
+                    self.transcript.record(event)
+        except asyncio.CancelledError:
+            raise
+        except Exception:
+            self._log.exception("transcript recorder stopped")
+        finally:
+            subscription.close()
+
+    async def close(self) -> None:
+        """Stop the stage and the recorder (process shutdown)."""
+        await self.stop()
+        if self._recorder is not None and not self._recorder.done():
+            self._recorder.cancel()
+            with contextlib.suppress(asyncio.CancelledError, Exception):
+                await self._recorder
 
     async def _run(self) -> None:
         queue: asyncio.Queue[bytes | None] = asyncio.Queue(maxsize=QUEUE_CHUNKS)
@@ -199,6 +231,8 @@ class StageRunner:
         lang = short_code(segment.language) if segment.language else None
         lang = lang or self.stage.primary_source_lang or "und"
         self.metrics.record(segment.latency_ms, is_final=segment.is_final)
+        if segment.is_final:
+            self._caption_chars += len(segment.text)
         if self._settings.log_transcripts:
             self._log.info(
                 "caption seq=%s final=%s lang=%s text=%s",
@@ -239,6 +273,8 @@ class StageRunner:
 
     def snapshot(self) -> dict[str, Any]:
         stats = self.session.stats if self.session else None
+        audio_seconds = (stats.bytes_sent / 32_000) if stats else 0.0
+        translation_usage = self.fanout.usage() if self.fanout else {}
         return {
             "id": self.stage.id,
             "name": self.stage.name,
@@ -260,7 +296,19 @@ class StageRunner:
             "p95_ms": self.metrics.finals.p95,
             "interim_p95_ms": self.metrics.interims.p95,
             "active_languages": self.fanout.active_languages() if self.fanout else [],
-            "translation_tokens": self.fanout.usage() if self.fanout else {},
+            "translation_tokens": translation_usage,
+            "running": self.running,
+            "audio_seconds": round(audio_seconds, 1),
+            "est_cost_usd": round(
+                estimate_stage_cost(
+                    audio_seconds,
+                    stt_response_tokens=stats.response_tokens if stats else 0,
+                    stt_response_chars=self._caption_chars,
+                    translation_usage=translation_usage,
+                ),
+                4,
+            ),
+            "transcript_entries": self.transcript.counts(),
         }
 
 
@@ -299,7 +347,7 @@ class StageManager:
             await runner.start()
 
     async def stop_all(self) -> None:
-        await asyncio.gather(*(runner.stop() for runner in self.runners.values()))
+        await asyncio.gather(*(runner.close() for runner in self.runners.values()))
 
     def snapshot(self) -> list[dict[str, Any]]:
         return [runner.snapshot() for runner in self.runners.values()]

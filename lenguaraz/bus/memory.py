@@ -24,10 +24,19 @@ class SlowConsumerError(Exception):
 
 
 class MemorySubscription:
-    def __init__(self, bus: MemoryBus, stage_id: str, lang: str | None, maxsize: int) -> None:
+    def __init__(
+        self,
+        bus: MemoryBus,
+        stage_id: str,
+        lang: str | None,
+        maxsize: int,
+        *,
+        internal: bool = False,
+    ) -> None:
         self._bus = bus
         self.stage_id = stage_id
         self.lang = lang
+        self.internal = internal  # recorders and other in-process consumers, not listeners
         self._maxsize = maxsize
         self._queue: deque[AnyEvent] = deque()
         self._ready = asyncio.Event()
@@ -98,19 +107,25 @@ class MemoryBus:
         for sub in tuple(self._subs.get(stage_id, ())):
             sub._offer(event)
 
-    def subscribe(self, stage_id: str, lang: str | None = None) -> MemorySubscription:
-        sub = MemorySubscription(self, stage_id, lang, self._queue_size)
+    def subscribe(
+        self, stage_id: str, lang: str | None = None, *, internal: bool = False
+    ) -> MemorySubscription:
+        sub = MemorySubscription(self, stage_id, lang, self._queue_size, internal=internal)
         self._subs.setdefault(stage_id, set()).add(sub)
         return sub
 
     def listeners(self, stage_id: str, lang: str | None = None) -> int:
-        subs = self._subs.get(stage_id, ())
+        subs = [sub for sub in self._subs.get(stage_id, ()) if not sub.internal]
         if lang is None:
             return len(subs)
         return sum(1 for sub in subs if sub.lang == lang)
 
     def languages_with_listeners(self, stage_id: str) -> set[str]:
-        return {sub.lang for sub in self._subs.get(stage_id, ()) if sub.lang is not None}
+        return {
+            sub.lang
+            for sub in self._subs.get(stage_id, ())
+            if sub.lang is not None and not sub.internal
+        }
 
     def _remove(self, sub: MemorySubscription) -> None:
         subs = self._subs.get(sub.stage_id)
