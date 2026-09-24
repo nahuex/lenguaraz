@@ -1,0 +1,19 @@
+#!/bin/sh
+# SPDX-License-Identifier: Apache-2.0
+# Pre-commit hook: secrets scan (gitleaks) + SPDX header check.
+# Install with `make hooks` (sets core.hooksPath=.githooks).
+set -e
+
+if command -v gitleaks >/dev/null 2>&1; then
+  gitleaks git --pre-commit --staged --redact --no-banner 2>/dev/null \
+    || gitleaks protect --staged --redact --no-banner
+elif command -v docker >/dev/null 2>&1 && docker info >/dev/null 2>&1; then
+  # `pwd -W` yields a C:/... path on Git Bash for Windows; plain pwd elsewhere.
+  repo_dir=$(pwd -W 2>/dev/null || pwd)
+  MSYS_NO_PATHCONV=1 docker run --rm -v "$repo_dir:/repo" -w /repo \
+    ghcr.io/gitleaks/gitleaks:latest git --pre-commit --staged --redact --no-banner
+else
+  echo "pre-commit: WARNING gitleaks not installed and docker unavailable — secrets scan skipped (CI enforces it)" >&2
+fi
+
+sh scripts/spdx_check.sh

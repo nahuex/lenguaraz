@@ -1,0 +1,21 @@
+Lenguaraz — the open-source interpreter for every stage
+Copyright 2026 Nahuel Cortes
+
+This product is licensed under the Apache License, Version 2.0 (the "License").
+You may obtain a copy of the License at
+
+    http://www.apache.org/licenses/LICENSE-2.0
+
+or in the LICENSE file at the root of this repository.
+
+Third-party software (Python and JavaScript dependencies) and external programs
+(ffmpeg, Redis, container base images) are used under their own licenses and are
+never vendored into this code base. The full list with attributions is generated
+into THIRD_PARTY_LICENSES.md by `make license-check`.
+
+The Gemini API is a hosted Google service governed by its own terms; the code in
+this repository that calls it is open source under the License above.
+
+Product and company names mentioned in this repository (Google, Gemini, Gemma,
+Nerdearla, OBS, vMix and others) may be trademarks of their respective owners.
+Trademarks and logos are not covered by the License and are not included here.

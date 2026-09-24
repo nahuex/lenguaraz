@@ -1,0 +1,15 @@
+# Normalize line endings to LF for every text file (Windows + Linux contributors, Docker builds)
+* text=auto eol=lf
+*.sh text eol=lf
+Makefile text eol=lf
+
+# Binary test media and images
+*.wav binary
+*.mp3 binary
+*.ogg binary
+*.png binary
+*.jpg binary
+*.gif binary
+*.ico binary
+*.woff binary
+*.woff2 binary

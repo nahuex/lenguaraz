@@ -1,0 +1,30 @@
+# Secrets and local-only files
+.env
+.env.local
+branding/local/
+MASTER_PROMPT.md
+
+# Python
+__pycache__/
+*.pyc
+.venv/
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+*.egg-info/
+
+# Node / frontend
+node_modules/
+dist/
+web/dist/
+
+# Runtime output
+exports/
+*.log
+.tmp/
+
+# OS / editors
+.DS_Store
+Thumbs.db
+.idea/
+.vscode/
