@@ -27,6 +27,7 @@ def build_parser() -> argparse.ArgumentParser:
         ("smoke-stt", "transcribe a sample with the real engine (uses quota)"),
         ("smoke-translate", "translate sample segments with the real model (uses quota)"),
         ("mvp-check", "scripted check of the MVP gates"),
+        ("simulate", "run N stages in one process and write the scale report"),
     ):
         sub.add_parser(name, help=help_text, add_help=False)  # tool parses its own options
     return parser
@@ -51,6 +52,10 @@ def main(argv: Sequence[str] | None = None) -> int:
             from lenguaraz.tools.smoke_translate import main as smoke_translate_main
 
             return smoke_translate_main(extra)
+        if command == "simulate":
+            from lenguaraz.tools.simulate import main as simulate_main
+
+            return simulate_main(extra)
         if command == "mvp-check":
             from lenguaraz.tools.mvp_check import main as mvp_main
 

@@ -46,8 +46,8 @@ smoke-stt: ## Real Gemini call: transcribe samples/en_kubernetes.wav, print WER/
 smoke-translate: ## Real Gemini call: translate sample segments EN->ES and ES->EN, report TTFT/latency/tokens/glossary adherence (uses quota)
 	$(UV) run lenguaraz smoke-translate $(SMOKE_ARGS)
 
-simulate: ## Replay N stages concurrently and write the scale report (feature 005)
-	@echo "simulate: not implemented yet (feature 005)"; exit 1
+simulate: ## Run N stages in one process (SIM_ARGS="--stages 10 --seconds 60 --real 2") and write docs/scale-report.md
+	$(UV) run lenguaraz simulate $(SIM_ARGS)
 
 samples: ## Generate EN/ES test audio + sentence boundaries with Gemini TTS into samples/ (uses quota)
 	$(UV) run lenguaraz samples $(SAMPLES_ARGS)
