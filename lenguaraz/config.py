@@ -246,6 +246,8 @@ class Settings(BaseSettings):
     translate_max_output_tokens: int = Field(default=512, ge=16, le=8192)
     gemini_translate_thinking: str = Field(default="minimal", pattern="^(minimal|low|medium|high)$")
     translate_context_segments: int = Field(default=3, ge=0, le=10)
+    auto_glossary: bool = True
+    auto_glossary_max_terms: int = Field(default=60, ge=1, le=100)
     gemini_translate_api: str = Field(
         default="generate_content", pattern="^(generate_content|interactions)$"
     )

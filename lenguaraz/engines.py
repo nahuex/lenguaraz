@@ -4,6 +4,7 @@
 from __future__ import annotations
 
 from lenguaraz.config import EngineKind, Settings
+from lenguaraz.glossary.auto import AutoGlossary, FakeAutoGlossary, GeminiAutoGlossary
 from lenguaraz.stt.base import SttEngine
 from lenguaraz.stt.fake import FakeSttEngine
 from lenguaraz.translate.base import TranslationEngine
@@ -24,3 +25,9 @@ def build_translation_engine(settings: Settings) -> TranslationEngine:
     from lenguaraz.translate.gemini import GeminiTranslationEngine  # lazy: SDK client
 
     return GeminiTranslationEngine(settings)
+
+
+def build_auto_glossary(settings: Settings) -> AutoGlossary:
+    if settings.engine is EngineKind.FAKE:
+        return FakeAutoGlossary(settings.auto_glossary_max_terms)
+    return GeminiAutoGlossary(settings)

@@ -25,8 +25,11 @@ transcription model as `custom_vocabulary`, which biases recognition toward thos
 and inserted as delimited data into every translation prompt with the rule "keep every term
 exactly as written". Put product names, acronyms, speaker names, the event name and any
 word the talk repeats. Terms are data, never instructions: the prompt neutralizes anything
-that looks like a command. Feature 006 builds a first glossary automatically from the talk
-title and abstract; feature 004 lets operators edit it live.
+that looks like a command. With `AUTO_GLOSSARY=true` (default) Lenguaraz also derives up to
+`AUTO_GLOSSARY_MAX_TERMS` terms from `talk.title` and `talk.abstract` before the stage starts
+(structured JSON output from the text model; a deterministic heuristic in dry-run mode) and
+merges them after your manual list, so your terms always win and the total stays ≤ 100. The
+stage snapshot shows `glossary_terms` and `auto_glossary_terms`.
 
 ```yaml
 glossary: ["Kubernetes", "eBPF", "Cilium", "CoreDNS", "Nerdearla", "Ana Pérez"]

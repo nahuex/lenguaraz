@@ -227,3 +227,37 @@ async def test_live_source_drops_oldest_when_the_queue_is_full() -> None:
     assert runner.state is StageState.LIVE
     await runner.stop()
     assert flood.closed is True
+
+
+async def test_runner_applies_auto_glossary(tmp_path: Path) -> None:
+    """Spec 006 AC-4: the merged glossary reaches the session and the snapshot."""
+    from lenguaraz.glossary import FakeAutoGlossary
+    from lenguaraz.stt.fake import ScriptedSttEngine, ScriptedSttSession
+
+    bus = MemoryBus()
+    wav = write_wav(tmp_path / "talk.wav", 1.0)
+    stage = StageConfig(
+        id="g",
+        name="G",
+        source=str(wav),
+        source_lang=["en-US"],
+        glossary=["Nerdearla"],
+        talk={"title": "Observability with eBPF", "abstract": "Cilium, Pixie and CoreDNS."},
+    )
+    engine = ScriptedSttEngine([ScriptedSttSession([], hold_open=True)])
+    runner = StageRunner(
+        stage,
+        engine=engine,  # type: ignore[arg-type]
+        bus=bus,
+        settings=settings(),
+        source_factory=fast_source,
+        auto_glossary=FakeAutoGlossary(),
+    )
+    await runner.start()
+    await asyncio.sleep(0.2)
+    assert engine.opened, "session not opened"
+    assert engine.opened[0].glossary == ["Nerdearla", "eBPF", "Cilium", "Pixie", "CoreDNS"]
+    snapshot = runner.snapshot()
+    assert snapshot["glossary_terms"] == 5 and snapshot["auto_glossary_terms"] == 4
+    assert runner.stage.glossary == ["Nerdearla"]  # the configured stage is untouched
+    await runner.stop()

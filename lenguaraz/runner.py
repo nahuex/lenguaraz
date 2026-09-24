@@ -17,6 +17,7 @@ from typing import Any
 from lenguaraz.bus.base import Bus
 from lenguaraz.config import Settings, StageConfig, StagesFile, VadMode, short_code
 from lenguaraz.export import TranscriptStore
+from lenguaraz.glossary.auto import AutoGlossary, merge_glossary, talk_text
 from lenguaraz.ingest import AudioSource, IngestError, open_source
 from lenguaraz.ingest.base import is_local_file
 from lenguaraz.metrics import StageMetrics
@@ -44,10 +45,14 @@ class StageRunner:
         source_factory: SourceFactory = open_source,
         metrics_interval: float = 5.0,
         translator: TranslationEngine | None = None,
+        auto_glossary: AutoGlossary | None = None,
     ) -> None:
         self.stage = stage
+        self.effective_stage = stage
         self._engine = engine
         self._translator = translator
+        self._auto_glossary = auto_glossary
+        self.auto_glossary_terms = 0
         self.fanout: TranslationFanout | None = None
         self._bus = bus
         self._settings = settings
@@ -117,10 +122,34 @@ class StageRunner:
             with contextlib.suppress(asyncio.CancelledError, Exception):
                 await self._recorder
 
+    async def _apply_auto_glossary(self) -> None:
+        """Diccionario: prime the glossary from the talk metadata (spec 006)."""
+        if self._auto_glossary is None or not self._settings.auto_glossary:
+            return
+        if not talk_text(self.stage):
+            return
+        try:
+            terms = await asyncio.wait_for(self._auto_glossary.suggest(self.stage), 10.0)
+        except TimeoutError:
+            self._log.warning("auto-glossary timed out; using the manual glossary")
+            return
+        except asyncio.CancelledError:
+            raise
+        except Exception as exc:
+            self._log.warning("auto-glossary failed: %s", exc)
+            return
+        merged = merge_glossary(self.stage.glossary, terms)
+        self.auto_glossary_terms = len(merged) - len(self.stage.glossary)
+        self.effective_stage = self.stage.model_copy(update={"glossary": merged})
+        self._log.info(
+            "auto-glossary added %d terms (total %d)", self.auto_glossary_terms, len(merged)
+        )
+
     async def _run(self) -> None:
         queue: asyncio.Queue[bytes | None] = asyncio.Queue(maxsize=QUEUE_CHUNKS)
+        await self._apply_auto_glossary()
         self.session = ManagedSttSession(
-            self.stage,
+            self.effective_stage,
             self._engine,
             emit=self._emit,
             on_state=self._on_session_state,
@@ -135,7 +164,7 @@ class StageRunner:
         )
         if self._translator is not None and self.stage.targets:
             self.fanout = TranslationFanout(
-                self.stage,
+                self.effective_stage,
                 self._translator,
                 self._bus,
                 self._settings,
@@ -309,6 +338,8 @@ class StageRunner:
                 4,
             ),
             "transcript_entries": self.transcript.counts(),
+            "glossary_terms": len(self.effective_stage.glossary),
+            "auto_glossary_terms": self.auto_glossary_terms,
         }
 
 
@@ -323,6 +354,7 @@ class StageManager:
         source_factory: SourceFactory = open_source,
         metrics_interval: float = 5.0,
         translator: TranslationEngine | None = None,
+        auto_glossary: AutoGlossary | None = None,
     ) -> None:
         self.bus = bus
         self.settings = settings
@@ -335,6 +367,7 @@ class StageManager:
                 source_factory=source_factory,
                 metrics_interval=metrics_interval,
                 translator=translator,
+                auto_glossary=auto_glossary,
             )
             for stage in stages.stages
         }
