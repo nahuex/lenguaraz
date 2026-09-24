@@ -1,0 +1,24 @@
+# SPDX-License-Identifier: Apache-2.0
+# Default stages: the two bundled samples, replayed in a loop so `make demo` never stops.
+# Every field is documented in docs/configuration.md. Copy examples/*.yaml for your event.
+stages:
+  - id: main
+    name: "Main Stage"
+    source: "samples/en_kubernetes.wav"   # file | http(s) HLS | rtmp:// | srt:// | device
+    source_lang: ["en-US"]                # [] = auto-detect (including code-switching)
+    targets: ["es", "pt"]
+    talk:
+      title: "Observability for Kubernetes with eBPF"
+      abstract: "Kernel-level tracing without sidecars: Cilium, Pixie, OpenTelemetry and what we measured."
+    glossary: ["Kubernetes", "eBPF", "Cilium", "Pixie", "OpenTelemetry", "Prometheus", "Grafana", "CoreDNS", "p99"]
+    loop: true
+  - id: workshop
+    name: "Workshop Room"
+    source: "samples/es_asyncio.wav"
+    source_lang: ["es-419"]
+    targets: ["en", "pt"]
+    talk:
+      title: "Subtítulos en vivo con Python y asyncio"
+      abstract: "Un servicio de transcripción y traducción por escenario, con TaskGroup, backpressure y Gemini Live."
+    glossary: ["asyncio", "TaskGroup", "backpressure", "ffmpeg", "WebSocket", "Gemini", "Docker", "Kubernetes", "eBPF", "Nerdearla"]
+    loop: true

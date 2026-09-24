@@ -1,0 +1,9 @@
+# SPDX-License-Identifier: Apache-2.0
+# Smallest useful configuration: one stage, one audio source, captions in the original
+# language plus Spanish. Start with: STAGES_FILE=examples/stages.minimal.yaml make dev
+stages:
+  - id: main
+    name: "Main Stage"
+    source: "samples/en_kubernetes.wav"   # replace with your stream, e.g. srt://10.0.0.5:9000?mode=caller
+    source_lang: ["en-US"]
+    targets: ["es"]
