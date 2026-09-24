@@ -1,9 +1,9 @@
 # STATE
 
-- Now (UTC): 2026-09-24T15:48Z — Window opened 2026-09-24T15:00:00Z (first session started 15:07Z)
-- Current milestone: M0 Kickoff (deadline 15:40Z) — T-000 done at 15:46Z; remaining exit criterion "specs 001+002 approved" projected ~16:30Z (≈50 min slip, absorbed before M1 18:30Z)
-- Done: PHASE 1 tooling (python 3.14 · uv 0.12.18 · node 24 · docker 29 · ffmpeg 9.0.2 · make 4.4.1 · gitleaks 8.30.1 · gh authed as nahuex · git 2.55; owner reports Gemini Docs MCP + gemini skills installed, verified after restart) · PHASE 2 governance files · H0 answered · **T-000 bootstrap: commit `06ef354` pushed to `main` on the public repo https://github.com/nahuex/lenguaraz — GitHub API reports license Apache-2.0** (verbatim Apache-2.0 LICENSE, NOTICE, .gitignore, .gitattributes, Makefile, spdx-check, pre-commit hook, README stub, docs/decisions.md) · ground truth re-verified against official docs (no drift; GT-13 model IDs added)
-- In progress: single restart so CLAUDE.md, slash commands, MCP and skills load natively → then `/kickoff`
-- Next 3: /specify 001 · /specify 002 · /plan 001
-- Risks: `.env.example` + `.env` still not created — `.claude/settings.json` deny list must read `Read(./.env)` + `Read(./.env.local)` (owner's edit left `Read(./.env.*)` in place); GEMINI_API_KEY not yet in `.env` → `make smoke-*` and `make samples` blocked until then · NOTICE copyright name "Nahuel Cortes" derived from git identity, owner to confirm spelling · MCP availability unverified until restart
+- Now (UTC): 2026-09-24T16:05Z — Window opened 2026-09-24T15:00:00Z (first session started 15:07Z)
+- Current milestone: **M0 Kickoff closed at 16:00Z** (20 min late: NOTICE/identity round-trip + settings fix). Next: M1 First words (deadline 18:30Z) — a sample file flows ffmpeg → STT → WS → browser, one stage, interim + final
+- Done: PHASE 1 tooling · PHASE 2 governance · H0 · T-000 bootstrap (`06ef354`, `95927fe`, `8a99bee`; public repo, GitHub reports Apache-2.0) · restart done: Gemini Docs MCP loaded and working (`gemini_search_docs` / `gemini_get_doc`) · `.env.example` + `.env` created (owner pastes GEMINI_API_KEY) · ground truth re-verified (no drift) · **spec 001 core-pipeline Approved (`e2c97bb`)** · **spec 002 translation Approved (`b6d6887`)** — open questions resolved with non-blocking defaults (HUMAN_INBOX S1-1, S1-2, S2-1)
+- In progress: /plan 001 (constitution gate + MCP-verified references)
+- Next 3: /plan 001 · /tasks 001 · /loop 001 (target M1 by 18:30Z)
+- Risks: GEMINI_API_KEY not yet confirmed in `.env` → `make smoke-stt` and `make samples` wait for the owner's "OK" · gemini skills (`gemini-live-api-dev`, `gemini-api-dev`) not visible in the skill list after restart (non-blocking, T0-3) · NOTICE name "Nahuel Cortes" to be confirmed by owner · M1 budget is 2h25m for config + ingest + STT + bus + WS + minimal UI: plan must keep the first vertical slice thin (fake engine first, real STT smoke as soon as the key is in)
 - Cuts applied: none
