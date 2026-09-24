@@ -2,11 +2,7 @@
 Buenas tardes a todos y gracias por venir al taller.
 Hoy vamos a construir un servicio de subtítulos en tiempo real con Python y asyncio.
 Cada escenario de la conferencia tiene su propio TaskGroup y su propia cola con backpressure.
-El audio entra por ffmpeg como PCM de dieciséis kilohercios y sale como eventos JSON por WebSocket.
 Para transcribir usamos la API Live de Gemini, que devuelve hipótesis parciales y resultados finales.
 Las sesiones duran diez minutos, así que rotamos la conexión sin perder ninguna frase.
-El servicio corre en un contenedor Docker sin privilegios y se despliega con docker compose up.
-Medimos la latencia p cincuenta y p noventa y cinco de cada subtítulo y la mostramos en el panel.
 El glosario de la charla mejora nombres como Kubernetes, eBPF o Nerdearla.
 Todo el código está publicado bajo licencia Apache dos punto cero.
-Muchas gracias, y ahora sí, manos a la obra.

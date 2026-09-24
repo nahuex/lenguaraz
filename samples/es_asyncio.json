@@ -1,0 +1,56 @@
+{
+  "sample": "es_asyncio",
+  "language": "es-419",
+  "voice": "Aoede",
+  "model": "gemini-3.1-flash-tts-preview",
+  "sample_rate": 16000,
+  "duration_ms": 49089,
+  "gap_ms": 1500,
+  "generated_at": "2026-09-24T17:03:49+00:00",
+  "license": "Apache-2.0",
+  "sentences": [
+    {
+      "index": 0,
+      "text": "Buenas tardes a todos y gracias por venir al taller.",
+      "start_ms": 0,
+      "end_ms": 3534
+    },
+    {
+      "index": 1,
+      "text": "Hoy vamos a construir un servicio de subtítulos en tiempo real con Python y asyncio.",
+      "start_ms": 5034,
+      "end_ms": 10595
+    },
+    {
+      "index": 2,
+      "text": "Cada escenario de la conferencia tiene su propio TaskGroup y su propia cola con backpressure.",
+      "start_ms": 12095,
+      "end_ms": 17927
+    },
+    {
+      "index": 3,
+      "text": "Para transcribir usamos la API Live de Gemini, que devuelve hipótesis parciales y resultados finales.",
+      "start_ms": 19427,
+      "end_ms": 26598
+    },
+    {
+      "index": 4,
+      "text": "Las sesiones duran diez minutos, así que rotamos la conexión sin perder ninguna frase.",
+      "start_ms": 28098,
+      "end_ms": 33863
+    },
+    {
+      "index": 5,
+      "text": "El glosario de la charla mejora nombres como Kubernetes, eBPF o Nerdearla.",
+      "start_ms": 35363,
+      "end_ms": 41730
+    },
+    {
+      "index": 6,
+      "text": "Todo el código está publicado bajo licencia Apache dos punto cero.",
+      "start_ms": 43230,
+      "end_ms": 47589
+    }
+  ],
+  "rejoined_at": "2026-09-24T17:07:16+00:00"
+}

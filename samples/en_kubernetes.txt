@@ -1,12 +1,8 @@
 # Reference transcript for samples/en_kubernetes.wav — one sentence per line. Apache-2.0.
 Good morning everyone, and welcome to the main stage.
 Today we are going to talk about observability for Kubernetes clusters using eBPF.
-Traditional sidecars add latency to every request, and they are painful to operate at scale.
 With eBPF we attach small programs to kernel hooks and collect metrics without touching the application.
 Tools like Cilium, Pixie and OpenTelemetry can export those signals to Prometheus and Grafana.
 In our benchmark, a cluster with three hundred pods produced two million spans per minute.
-The p99 latency of the ingress controller dropped from eighty milliseconds to twelve.
 We also traced DNS timeouts inside CoreDNS that no dashboard had ever shown us.
-The whole pipeline runs on Linux nodes with kernel five point fifteen or newer.
 Everything is open source, and the code is on GitHub under the Apache license.
-Thank you, and let's go to the questions.
