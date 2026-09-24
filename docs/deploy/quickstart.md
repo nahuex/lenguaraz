@@ -12,7 +12,7 @@ docker compose up --build
 ```
 
 Open http://localhost:8000. You should see two stages ("Main Stage" and "Workshop Room")
-with a **DRY-RUN** badge. Click **Open Fogón** on a stage: captions appear within a few
+with a **DRY-RUN** badge. Click **Open Fogón · live captions** on a stage: captions appear within a few
 seconds, word by word, from the bundled samples. `http://localhost:8000/healthz` returns
 `{"status":"ok","engine":"fake","stages":2,…}`.
 

@@ -38,7 +38,7 @@ export function StageCard({ stage }: StageCardProps) {
         to={`/fogon/${encodeURIComponent(stage.id)}`}
         className="mt-auto inline-flex w-fit items-center rounded-md bg-accent px-4 py-2 font-semibold text-accent-ink hover:opacity-90"
       >
-        Open Fogón
+        Open Fogón · live captions
         <span className="sr-only"> for {stage.name}</span>
       </Link>
     </article>

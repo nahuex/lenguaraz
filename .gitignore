@@ -2,6 +2,7 @@
 .env
 .env.local
 branding/local/
+samples/local/
 MASTER_PROMPT.md
 
 # Python

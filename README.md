@@ -42,7 +42,7 @@ cp .env.example .env      # set GEMINI_API_KEY=… (or ENGINE=fake for a credent
 docker compose up --build
 ```
 
-Then open http://localhost:8000 and click **Open Fogón** on a stage. Full walkthrough,
+Then open http://localhost:8000 and click **Open Fogón · live captions** on a stage. Full walkthrough,
 developer path and troubleshooting: [docs/deploy/quickstart.md](docs/deploy/quickstart.md).
 
 **Requirements:** Docker (or Python 3.12 + [uv](https://docs.astral.sh/uv/) + Node 24 +
@@ -81,6 +81,31 @@ stages.yaml ─▶ one isolated pipeline per stage:
 Details, event contract and endpoints: [docs/architecture.md](docs/architecture.md).
 Every setting and every `stages.yaml` field: [docs/configuration.md](docs/configuration.md).
 
+## Scaling to more stages
+
+Every stage is one isolated pipeline (one ffmpeg process, one Live transcription session,
+one translation worker per active language) inside the same process, so adding a stage is
+adding an entry to `stages.yaml`; two stages ship by default and ten look exactly the same.
+What grows with the number of stages is (1) CPU for ffmpeg decoding, roughly 2–5 % of a core
+per stream, (2) memory, a few tens of MB per stage, and (3) your Gemini project's limit on
+concurrent Live sessions, which is per project and tier and visible in Google AI Studio (the
+free tier allows only a handful; use a paid-tier project for real events). Beyond one machine,
+set `REDIS_URL` (feature 005) to run several workers that share the event bus, each owning a
+subset of the stages, behind any HTTP load balancer, because captions are plain WebSocket
+events. Cost grows with stages, not with stages × languages: one transcription stream per
+stage feeds every language as text. The scale report from `make simulate` (feature 005) and
+the sizing table in `docs/deploy/scaling.md` (feature 008) put measured numbers on this.
+
+## Technical glossary & proper names
+
+Talks are full of terms that generic speech recognition mangles ("eBPF", "CoreDNS", speaker
+and product names). Each stage carries a `glossary` list in `stages.yaml`; Lenguaraz sends it
+to the transcription model as `custom_vocabulary` (biasing recognition toward those terms) and
+inserts it, clearly delimited, into every translation prompt with the instruction to keep
+those terms verbatim. `make smoke-stt` and `make smoke-translate` report how often the
+glossary terms come out right. Feature 006 builds the list automatically from the talk title
+and abstract.
+
 ## Test audio
 
 `samples/` ships two short talks generated with Gemini TTS from original scripts written for
@@ -97,6 +122,11 @@ older** and deployments must not be directed at minors. On the unpaid tier Googl
 content to improve its products; use a **paid-tier project** for real events.
 
 ## How this repo is built
+
+Everything in this repository was created inside the Vibeathon window (2026-09-24 15:00 UTC to
+2026-09-25 15:00 UTC); the git history is the evidence. Before the window opened, the team only
+read the challenge rules, the public Gemini API documentation and two public example projects
+for lessons; those notes are dated in `.specify/memory/` and contain no code.
 
 Spec-driven development with an AI engineering crew and one human owner: every feature goes
 `spec.md → plan.md → tasks.md → implementation loop`, with a constitution as supreme law.
