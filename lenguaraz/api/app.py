@@ -16,6 +16,7 @@ from fastapi.staticfiles import StaticFiles
 from lenguaraz import __version__
 from lenguaraz.api.admin import router as admin_router
 from lenguaraz.api.ws import ConnectionLimiter, caption_socket
+from lenguaraz.branding import load_branding
 from lenguaraz.bus.base import Bus
 from lenguaraz.bus.memory import MemoryBus
 from lenguaraz.config import Settings, StagesFile, load_settings
@@ -67,6 +68,7 @@ def create_app(
         auto_glossary=auto_glossary,
     )
     dist = web_dist or settings.web_dist or default_web_dist()
+    branding = load_branding(settings.branding_file)
 
     @asynccontextmanager
     async def lifespan(_: FastAPI) -> AsyncIterator[None]:
@@ -96,6 +98,10 @@ def create_app(
     async def list_stages() -> list[dict[str, Any]]:
         return manager.snapshot()
 
+    @app.get("/api/branding")
+    async def get_branding() -> dict[str, Any]:
+        return branding.as_dict()
+
     @app.websocket("/ws/{stage_id}")
     async def ws_captions(
         websocket: WebSocket, stage_id: str, lang: str | None = Query(default=None)
@@ -107,6 +113,9 @@ def create_app(
     index = dist / "index.html"
     if (dist / "assets").is_dir():
         app.mount("/assets", StaticFiles(directory=dist / "assets"), name="assets")
+    local_branding = Path("branding") / "local"  # git-ignored logos, served read-only
+    if local_branding.is_dir():
+        app.mount("/branding", StaticFiles(directory=local_branding), name="branding")
 
     @app.get("/{path:path}", include_in_schema=False)
     async def spa(path: str, request: Request) -> Any:

@@ -46,6 +46,7 @@ editing files.
 | `LOG_TRANSCRIPTS` | boolean | `false` | When `true`, caption text is written to the logs. Off by default for privacy. |
 | `REDIS_URL` | URL | *(empty)* | When set, the event bus uses Redis so several workers can share stages (feature 005). Empty = in-memory bus, single process. |
 | `STAGES_FILE` | path | `stages.yaml` | Path to the stages file. |
+| `BRANDING_FILE` | path | `branding.yaml` | Optional branding file (see below); when the file does not exist the neutral Lenguaraz theme is used. |
 | `HOST` | address | `0.0.0.0` | Bind address of the API. |
 | `PORT` | integer | `8000` | Port of the API and the audience view. |
 | `LOG_LEVEL` | `DEBUG` … `ERROR` | `INFO` | Log level. Logs are JSON lines with `stage_id`, `session_id`, `seq` and `component`. |
@@ -83,3 +84,19 @@ stages:
 
 Examples: `examples/stages.minimal.yaml` (one stage) and the default `stages.yaml` (two
 looped sample stages).
+
+## `branding.yaml`
+
+Optional. Gives the audience pages the event's identity without touching code
+(`examples/branding.example.yaml`). Served as `GET /api/branding`; the pages read it on load.
+
+| Field | Type | Default | Validation |
+|---|---|---|---|
+| `event_name` | string ≤120 | `Lenguaraz` | Angle brackets are neutralized (plain text only). Shown in the header and page titles. |
+| `tagline` | string ≤120 | `Live captions and translation` | Plain text. Header subtitle. |
+| `primary_color` | `#RRGGBB` | `#2563eb` | Must be a 6-digit hex color. Accent for links, badges and the language picker. |
+| `logo_url` | URL or path | none | `https://…`, `http://…` or `/branding/<file>` (files under the git-ignored `branding/local/` directory are served at `/branding/`). |
+| `footer` | string ≤120 | `Powered by Lenguaraz · open source under Apache-2.0` | Plain text. |
+
+Unknown fields are rejected at startup so typos are caught. Trademarks and logos are never
+committed to this repository (Constitution Art. XVII.C); mount them at runtime.

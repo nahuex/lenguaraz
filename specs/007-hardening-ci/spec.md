@@ -1,6 +1,6 @@
 # Spec 007 — hardening & CI
 
-**Status:** Approved · **Owner:** human · **Author:** agent · **Created:** 2026-09-24T22:05Z
+**Status:** Shipped · **Owner:** human · **Author:** agent · **Created:** 2026-09-24T22:05Z
 **Constitution:** v1.0.0 · **Backlog row:** product.md §6 #007
 
 ## 1. Why

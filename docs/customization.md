@@ -31,6 +31,14 @@ that looks like a command. With `AUTO_GLOSSARY=true` (default) Lenguaraz also de
 merges them after your manual list, so your terms always win and the total stays ≤ 100. The
 stage snapshot shows `glossary_terms` and `auto_glossary_terms`.
 
+## Branding
+
+Copy `examples/branding.example.yaml` to `branding.yaml` (or set `BRANDING_FILE`) and set
+`event_name`, `tagline`, `primary_color`, `logo_url` and `footer`. Put logo files in
+`branding/local/` (git-ignored, served at `/branding/`) or use an `https://` URL. The Docker
+image reads `branding.yaml` from the working directory; mount it read-only like `stages.yaml`
+(`- ./branding.yaml:/app/branding.yaml:ro`). Field validation is listed in `docs/configuration.md`.
+
 ```yaml
 glossary: ["Kubernetes", "eBPF", "Cilium", "CoreDNS", "Nerdearla", "Ana Pérez"]
 ```

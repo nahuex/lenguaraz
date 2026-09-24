@@ -49,8 +49,9 @@ stages:
 ```
 
 Restart the container (`docker compose restart`). Share `http://<your-host>:8000/fogon/main`
-with the audience. Anything ffmpeg can read works as a `source`; `docs/deploy/audio-sources.md`
-(feature 008) has copy-paste recipes for OBS, vMix, HLS and SRT.
+with the audience. Anything ffmpeg can read works as a `source`; `docs/deploy/audio-sources.md` has
+copy-paste recipes for OBS, vMix, HLS and SRT. For a public deployment with TLS see
+`docs/deploy/production.md`; for Google Cloud, `docs/deploy/cloud-run.md`.
 
 ## Developer path (without Docker)
 
@@ -71,5 +72,6 @@ make verify                      # lint, types, tests, frontend build, SPDX head
 | Stage shows `STOPPED` with `cannot open WAV` / `ffmpeg exited` | The `source` path or URL is wrong, or ffmpeg is missing → fix the path, install ffmpeg or set `FFMPEG_BIN`. |
 | Stage shows `DEGRADED` with `quota exhausted (429…)` | Free-tier limits or the 10-minute spend cap → enable billing on the project, or reduce concurrent stages. |
 | Stage shows `STOPPED` with `authentication failed` | Wrong `GEMINI_API_KEY` → paste the key from AI Studio into `.env`. |
-| Captions stop after ~10 minutes | The Live session lifetime; Lenguaraz reopens the session automatically (`ROTATING`); seamless make-before-break rotation lands in feature 003. |
+| Stage shows `ROTATING` for a moment every ~9 minutes | Normal: the Live session lifetime is 10 minutes; Lenguaraz opens the next session before that and switches at a pause (no sentence is lost). |
+| Captions stop while the speaker talks | The stall watchdog reopens the session after `STT_STALL_SECONDS`; if it repeats, check the audio level (`docs/troubleshooting.md`). |
 | Home page says "audience view is not built yet" | Run `make web` (developer path); the Docker image builds it automatically. |

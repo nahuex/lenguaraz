@@ -64,8 +64,8 @@ spdx-check: ## Every source file starts with the SPDX header (Constitution Art. 
 docs-check: ## Every config key is documented and every relative doc link resolves
 	$(UV) run python scripts/docs_check.py
 
-fresh-clone-test: ## Clone the public repo into a temp dir and follow quickstart.md in dry-run mode (feature 008)
-	@echo "fresh-clone-test: not implemented yet (feature 008)"; exit 1
+fresh-clone-test: ## Clone the public repo into a temp dir and follow quickstart.md in dry-run mode (Docker if available; FRESH_ARGS="--mode local")
+	$(UV) run python scripts/fresh_clone_test.py $(FRESH_ARGS)
 
 hooks: ## Install the git pre-commit hook (gitleaks + SPDX check)
 	@git config core.hooksPath .githooks && chmod +x .githooks/* scripts/*.sh && echo "hooks: core.hooksPath=.githooks"

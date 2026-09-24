@@ -3,6 +3,8 @@
 *The open-source interpreter for every stage.* Pronounced *len-gwa-RAHS*.
 
 [![License: Apache-2.0](https://img.shields.io/badge/License-Apache--2.0-blue.svg)](LICENSE)
+[![CI](https://github.com/nahuex/lenguaraz/actions/workflows/ci.yml/badge.svg)](https://github.com/nahuex/lenguaraz/actions/workflows/ci.yml)
+[Leer en español](README.es.md)
 
 Lenguaraz turns the audio of every stage of a conference into live captions, in the language
 being spoken and translated into the languages the audience asks for. One YAML file describes
@@ -16,6 +18,8 @@ understands it in their own language.
 
 > **Status:** built during the Nerdearla Vibeathon 2026 window (2026-09-24 15:00 UTC →
 > 2026-09-25 15:00 UTC). Features land in order; this README says what works today.
+
+<!-- screenshot: docs/img/fogon.png — captured by the owner at H4 (Fogón with two languages) -->
 
 ## What it does today
 
@@ -128,6 +132,23 @@ this project (English: Kubernetes and eBPF; Spanish: Python asyncio), with refer
 transcripts and exact sentence boundaries. They are released under Apache-2.0 like everything
 else here. Regenerate them with `make samples`.
 
+## Documentation
+
+Written for a volunteer tech lead at a conference we have never met (see the
+[constitution](.specify/memory/constitution.md), Art. XVII.D):
+
+| Deploy | Operate | Understand |
+|---|---|---|
+| [Quickstart](docs/deploy/quickstart.md) · [en español](docs/es/quickstart.md) | [Operations runbook](docs/operations/runbook.md) | [Architecture](docs/architecture.md) |
+| [Production (VM + Compose + TLS)](docs/deploy/production.md) | [Troubleshooting](docs/troubleshooting.md) | [Configuration reference](docs/configuration.md) |
+| [Cloud Run](docs/deploy/cloud-run.md) | [Customization: languages, glossary, branding, overlay](docs/customization.md) | [Cost per stage-hour](docs/cost.md) · [Metrics](docs/metrics.md) · [Scale report](docs/scale-report.md) |
+| [Scaling to 30+ stages](docs/deploy/scaling.md) | [Security](docs/security.md) · [Privacy](docs/privacy.md) · [SECURITY.md](SECURITY.md) | [Decisions log](docs/decisions.md) · [Changelog](CHANGELOG.md) |
+| [Audio sources: SRT, RTMP, HLS, OBS, files](docs/deploy/audio-sources.md) | [Examples: stages, branding, .env profiles](examples/) | [Contributing](CONTRIBUTING.md) · [Code of conduct](CODE_OF_CONDUCT.md) |
+
+`make docs-check` verifies that this set exists, that every setting is documented and that
+every link resolves; `make fresh-clone-test` clones the public repo into an empty directory and
+follows the quickstart in dry-run mode until captions flow.
+
 ## Security & privacy
 
 The Gemini API key lives only on the server. Audience endpoints are read-only and rate-limited
@@ -135,6 +156,41 @@ per IP. Audio is never written to disk; captions live in a bounded in-memory buf
 only logged when `LOG_TRANSCRIPTS=true`. The Gemini API requires operators to be **18 or
 older** and deployments must not be directed at minors. On the unpaid tier Google may use
 content to improve its products; use a **paid-tier project** for real events.
+
+## Limitations
+
+- **One process owns its stages.** Scale out by running several instances with disjoint
+  `stages.yaml` files; there is no shared bus yet (planned, cut from the hackathon scope).
+- **Captions are not persisted.** Export SRT/VTT/TXT from Mangrullo before stopping a stage.
+- **Latency depends on the source.** Measured ≈0.9 s from the end of a sentence to its final
+  caption on clean audio (`docs/metrics.md`); HLS inputs add their segment length.
+- **Quality depends on the audio and the glossary.** A music bed or a distant microphone hurts
+  recognition more than any setting; the glossary fixes names, not noise.
+- **The Live API has variance.** Sessions occasionally stall; the watchdog reopens them after
+  `STT_STALL_SECONDS` and the operator sees it as `stalls` in Mangrullo.
+- **Concurrent sessions are a Google project quota**, per tier; plan them before the event
+  (`docs/deploy/scaling.md`).
+- Spoken interpretation, browser microphone ingest and an offline fallback are specified in the
+  backlog but not built.
+
+## Prior art & acknowledgments
+
+Before the window opened we read two public projects for lessons, never for code; every line
+here was re-derived from the official Gemini documentation (`.specify/memory/prior-art.md`
+records what we adopted and what we do differently):
+
+- **Google's `gemini-live-translate-livekit`** (Apache-2.0): one model session per language
+  shared by all listeners, captions on a channel separate from audio, serialized audio
+  writes, Cloud Run flags for long-lived sessions. We keep the ideas and drop the WebRTC media
+  server: captions are text, so a WebSocket behind any load balancer is enough.
+- **LiveKit's `gemini-live-translate` and `live-translated-captioning` examples** (MIT): the
+  demand-driven creation and teardown of translation workers and the interim/final caption
+  contract.
+- **Google's `gemini-live-api-examples`**: the Live API event shapes we verified against the
+  SDK before writing the ground truth.
+
+Thanks to the Nerdearla team for a challenge that is about access, and to Google for the
+Live API and the AI Studio credits that paid for the measurements in this repo.
 
 ## How this repo is built
 

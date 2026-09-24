@@ -1,0 +1,34 @@
+# SPDX-License-Identifier: Apache-2.0
+# Three-track conference: two live encoder feeds plus a workshop room that speaks Spanish.
+# Copy to ./stages.yaml (or point STAGES_FILE at it) and edit. Every field is documented in
+# docs/configuration.md; audio recipes are in docs/deploy/audio-sources.md.
+stages:
+  - id: main
+    name: "Main Stage"
+    source: "srt://0.0.0.0:9000?mode=listener&latency=200000"   # encoder → SRT caller
+    source_lang: ["en-US"]           # what the speakers speak (BCP-47)
+    targets: ["es", "pt-BR"]         # languages the audience can pick
+    talk:
+      title: "Opening keynote: platform engineering in 2026"
+      abstract: "Internal developer platforms, Backstage, Crossplane and the SRE handoff."
+    glossary: ["Backstage", "Crossplane", "SRE", "Kubernetes", "ArgoCD", "Terraform", "OpenTelemetry"]
+
+  - id: track-b
+    name: "Track B · Data & AI"
+    source: "rtmp://media.example.org/live/track-b"              # pulled from your media server
+    source_lang: ["en-US"]
+    targets: ["es"]
+    talk:
+      title: "Serving LLMs on a budget"
+      abstract: "Quantization, vLLM, batching and the cost per million tokens."
+    glossary: ["vLLM", "LLM", "GPU", "CUDA", "Gemini", "quantization", "tokens"]
+
+  - id: workshop
+    name: "Workshop Room (Spanish)"
+    source: "https://cdn.example.org/live/workshop/index.m3u8"   # HLS adds a few seconds
+    source_lang: ["es-419"]
+    targets: ["en", "pt-BR"]
+    talk:
+      title: "Taller: observabilidad con OpenTelemetry"
+      abstract: "Trazas, métricas y logs con el Collector, Prometheus y Grafana."
+    glossary: ["OpenTelemetry", "Collector", "Prometheus", "Grafana", "Kubernetes", "eBPF"]

@@ -136,3 +136,17 @@ async def test_ffmpeg_bad_source_reports_stderr(tmp_path: Path) -> None:
     assert FFMPEG is not None
     with pytest.raises(IngestError, match="ffmpeg exited"):
         await collect(FfmpegSource(str(tmp_path / "missing.mp3"), ffmpeg_bin=FFMPEG))
+
+
+def test_redact_source_hides_credentials() -> None:
+    from lenguaraz.ingest.ffmpeg import redact_source
+
+    assert redact_source("rtmp://user:s3cret@media.example.org/live/main") == (
+        "rtmp://***@media.example.org/live/main"
+    )
+    assert redact_source("srt://0.0.0.0:9000?mode=listener") == "srt://0.0.0.0:9000?mode=listener"
+    assert redact_source("recordings/talk.mp4") == "recordings/talk.mp4"
+    assert (
+        redact_source("https://cdn.example.org/a@b/index.m3u8")
+        == "https://cdn.example.org/a@b/index.m3u8"
+    )

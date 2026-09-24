@@ -120,6 +120,29 @@ export function fetchHealth(signal?: AbortSignal): Promise<Health> {
   return getJson<Health>('/healthz', signal);
 }
 
+/** Event identity from `GET /api/branding` (runtime configuration, never code). */
+export interface Branding {
+  event_name: string;
+  tagline: string;
+  /** `#RRGGBB`, validated by the backend. */
+  primary_color: string;
+  logo_url: string | null;
+  footer: string;
+}
+
+/** Neutral theme used until the backend answers (and when it never does). */
+export const DEFAULT_BRANDING: Branding = {
+  event_name: 'Lenguaraz',
+  tagline: 'Live captions and translation',
+  primary_color: '#2563eb',
+  logo_url: null,
+  footer: 'Powered by Lenguaraz · open source under Apache-2.0',
+};
+
+export function fetchBranding(signal?: AbortSignal): Promise<Branding> {
+  return getJson<Branding>('/api/branding', signal);
+}
+
 function bearer(token: string): Record<string, string> {
   return { Authorization: `Bearer ${token}` };
 }

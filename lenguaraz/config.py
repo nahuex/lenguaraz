@@ -255,6 +255,7 @@ class Settings(BaseSettings):
     log_transcripts: bool = False
     redis_url: str = ""
     stages_file: Path = Path("stages.yaml")
+    branding_file: Path = Path("branding.yaml")  # optional; defaults when missing
     host: str = "0.0.0.0"
     port: int = Field(default=8000, ge=1, le=65535)
     log_level: str = "INFO"

@@ -18,6 +18,16 @@ KILL_AFTER_SECONDS = 2.0
 STDERR_TAIL_BYTES = 2_000
 
 
+def redact_source(source: str) -> str:
+    """Hide ``user:pass@`` in URLs before they reach a public stage detail."""
+    scheme, sep, rest = source.partition("://")
+    if not sep or "@" not in rest.split("/", 1)[0]:
+        return source
+    authority, slash, path = rest.partition("/")
+    host = authority.rsplit("@", 1)[1]
+    return f"{scheme}://***@{host}{slash}{path}"
+
+
 def build_ffmpeg_args(
     source: str, *, ffmpeg_bin: str = "ffmpeg", realtime: bool = True, loop: bool = False
 ) -> list[str]:
@@ -91,8 +101,9 @@ class FfmpegSource:
             if not self._closed:
                 await process.wait()
                 if process.returncode not in (0, None):
+                    shown = redact_source(self._source)
                     raise IngestError(
-                        f"ffmpeg exited with {process.returncode} for {self._source}: "
+                        f"ffmpeg exited with {process.returncode} for {shown}: "
                         f"{await self._stderr_tail()}"
                     )
         finally:
