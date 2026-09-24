@@ -12,9 +12,10 @@ WORKFLOW = ROOT / ".github" / "workflows" / "ci.yml"
 
 
 def steps_text(job: dict) -> str:
-    return "\n".join(
-        str(step.get("run", "")) + " " + str(step.get("uses", "")) for step in job["steps"]
-    )
+    parts = []
+    for step in job["steps"]:
+        parts.append(" ".join(str(step.get(key, "")) for key in ("run", "uses", "with")))
+    return chr(10).join(parts)
 
 
 def test_ci_workflow_has_every_gate() -> None:
