@@ -1,6 +1,6 @@
 # Spec 008 — deployability docs & submission
 
-**Status:** Approved · **Owner:** human · **Author:** agent · **Created:** 2026-09-24T22:16Z
+**Status:** Shipped · **Owner:** human · **Author:** agent · **Created:** 2026-09-24T22:16Z
 **Constitution:** v1.0.0 · **Backlog row:** product.md §6 #008
 
 ## 1. Why

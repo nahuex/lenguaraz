@@ -19,7 +19,7 @@ stages.yaml + .env ──▶ config (pydantic)
                             Chasque bus/     in-memory pub/sub, bounded queues, drop-oldest-interim
                              │
                      api/ws.py  WS /ws/{stage}?lang=   ─▶  Fogón /fogon/{stage}  (audience)
-                     api/app.py GET /healthz · /api/stages · static SPA (web/dist)
+                     api/app.py GET /healthz · /api/stages · /api/branding · static SPA (web/dist)
 ```
 
 ## Components
@@ -76,6 +76,7 @@ The first message is always a `status` event. Then, one JSON object per message:
 | `GET /healthz` | `{"status":"ok","engine":"gemini|fake","stages":N,"version":"…"}` |
 | `GET /api/stages` | One row per stage: `id`, `name`, `state`, `detail`, `source_lang`, `targets`, `languages`, `listeners`, `dry_run`, `session_id`, `rotations`, `errors`, `captions_final`, `p50_ms`, `p95_ms`, `interim_p95_ms` |
 | `GET /` , `/fogon/{stage}`, `/pizarron/{stage}`, `/mangrullo` | The single-page app: home, audience view, overlay, operations |
+| `GET /api/branding` | Event identity from `branding.yaml` (`event_name`, `tagline`, `primary_color`, `logo_url`, `footer`), defaults when the file is absent; `/branding/*` serves `branding/local/` read-only |
 | `GET /api/admin/stages` (Bearer) | Snapshots plus `running`, `audio_seconds`, `est_cost_usd`, `transcript_entries` |
 | `POST /api/admin/stages/{id}/start` · `/stop` (Bearer) | Start or stop a stage runner |
 | `GET /api/admin/stages/{id}/export?format=srt\|vtt\|txt&lang=` (Bearer) | Transcript download (`Content-Disposition: attachment`) |

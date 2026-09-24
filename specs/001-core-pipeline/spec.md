@@ -1,6 +1,6 @@
 # Spec 001 — core-pipeline
 
-**Status:** Shipped (H1 pending) · **Owner:** human · **Author:** agent · **Created:** 2026-09-24T15:58Z
+**Status:** Shipped (H1 OK 2026-09-24T22:40Z) · **Owner:** human · **Author:** agent · **Created:** 2026-09-24T15:58Z
 **Constitution:** v1.0.0 · **Backlog row:** product.md §6 #001
 
 ## 1. Why

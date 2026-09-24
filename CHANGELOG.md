@@ -54,8 +54,17 @@ task ids refer to the specs under `specs/`; the full history is `git log`.
   allowlist and a generated `THIRD_PARTY_LICENSES.md`; Dependabot; `SECURITY.md`; container
   hardening tests; STT stall watchdog (`STT_STALL_SECONDS`) that reopens a session that goes
   silent while speech keeps flowing.
-- **Deployability docs (008, in progress):** `docs/security.md`, `docs/privacy.md`,
-  `CONTRIBUTING.md`, `CODE_OF_CONDUCT.md` and this changelog.
+- **Deployability docs (008):** the full documentation set for any conference:
+  `docs/deploy/production.md`, `audio-sources.md`, `cloud-run.md`, `docs/security.md`,
+  `docs/privacy.md`, `CONTRIBUTING.md`, `CODE_OF_CONDUCT.md`, `README.es.md`,
+  `docs/es/quickstart.md`, `docs/devpost.md`, `docs/video-script.md`, examples (multitrack
+  stages, branding, `.env` profiles); `make docs-check` enforces the required set; `make
+  fresh-clone-test` clones the public repo and follows the quickstart in dry-run mode.
+- **Branding as runtime configuration (008):** `BRANDING_FILE` (`branding.yaml`) with
+  validated `event_name`, `tagline`, `primary_color`, `logo_url`, `footer`, served at
+  `GET /api/branding` and shown in the page header; no brand asset is committed.
+- **Credential redaction (008):** `user:pass@` in a stage `source` URL never reaches the
+  public stage detail when ffmpeg fails.
 
 ### Changed
 - Hybrid VAD is the default (`VAD_MODE=hybrid`) after measuring utterance-to-final p95 of
@@ -75,12 +84,12 @@ task ids refer to the specs under `specs/`; the full history is `git log`.
   dying, opening a third session; receiver results are now tied to their session (003).
 - A sentence split or lost across a forced rotation; verified 0 lost, 0 duplicated finals (003).
 
-## [0.2.0] — (tag pending owner checkpoint)
+## [0.2.0] — (tag pending owner checkpoint H3)
 
 Scale and operations milestone: features 003–007 above will move here when the owner
 approves the tag after reviewing the simulator report and the fresh-clone test.
 
-## [0.1.0] — (tag pending owner checkpoint)
+## [0.1.0] - 2026-09-24 — MVP approved by the owner at checkpoint H2: both stages live with the real engine, EN↔ES in the browser.
 
 MVP milestone: features 001–002 above will move here when the owner approves the tag after
 the live two-stage demo.

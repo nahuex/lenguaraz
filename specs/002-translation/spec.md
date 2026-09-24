@@ -1,6 +1,6 @@
 # Spec 002 — translation
 
-**Status:** Shipped (H2 pending) · **Owner:** human · **Author:** agent · **Created:** 2026-09-24T16:02Z
+**Status:** Shipped (H2 OK 2026-09-24T22:40Z) · **Owner:** human · **Author:** agent · **Created:** 2026-09-24T16:02Z
 **Constitution:** v1.0.0 · **Backlog row:** product.md §6 #002
 
 ## 1. Why
