@@ -100,6 +100,11 @@ class ManagedSttSession:
 
     # -- timing ------------------------------------------------------------------------
 
+    @property
+    def stream_start(self) -> float | None:
+        """Monotonic wall time at which the first audio chunk was sent."""
+        return self._start_wall
+
     def t_audio_ms(self) -> int:
         return self.stats.bytes_sent // BYTES_PER_MS
 

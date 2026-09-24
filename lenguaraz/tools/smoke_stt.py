@@ -1,0 +1,239 @@
+# SPDX-License-Identifier: Apache-2.0
+"""``make smoke-stt``: transcribe a bundled sample with the real Gemini engine.
+
+Uses quota (Constitution Art. XII.2: never in the test suite). Prints the finals, the word
+error rate against the reference transcript, interim and final latency percentiles and the
+token usage, then appends a dated row to ``docs/metrics.md``.
+"""
+
+from __future__ import annotations
+
+import argparse
+import asyncio
+import json
+import re
+import sys
+import time
+from collections.abc import Sequence
+from datetime import UTC, datetime
+from pathlib import Path
+
+from lenguaraz.config import ConfigError, EngineKind, StageConfig, StagesFile, load_settings
+from lenguaraz.ingest import open_source
+from lenguaraz.logsetup import configure_logging
+from lenguaraz.metrics import percentile
+from lenguaraz.models import StageState
+from lenguaraz.stt.gemini import GeminiSttEngine
+from lenguaraz.stt.session import ManagedSttSession, Segment
+
+METRICS_FILE = Path("docs/metrics.md")
+METRICS_INTRO = (
+    "# Metrics\n\n"
+    "Measured by the project's own tooling (Constitution Art. V.2). `latency_ms` = caption "
+    "publish time minus the audio-timeline position of the newest chunk already sent. "
+    "Utterance-to-final = wall time of the final minus the wall time at which the sentence "
+    "ended in the audio (from the sample's sentence boundaries).\n\n"
+    "## smoke-stt runs\n\n"
+)
+METRICS_HEADER = (
+    "| Date (UTC) | Sample | Mode | Finals | WER | Interim p50/p95 ms | Final p50/p95 ms | "
+    "Utterance-to-final p50/p95 ms | Tokens (in/out) |\n"
+    "|---|---|---|---|---|---|---|---|---|\n"
+)
+WER_LIMIT = 0.25
+
+
+def normalize(text: str) -> list[str]:
+    return re.sub(r"[^\w\s]", " ", text.lower()).split()
+
+
+def word_error_rate(reference: str, hypothesis: str) -> float:
+    ref, hyp = normalize(reference), normalize(hypothesis)
+    if not ref:
+        return 0.0
+    try:
+        import jiwer
+
+        return float(jiwer.wer(" ".join(ref), " ".join(hyp)))
+    except ImportError:  # pragma: no cover - jiwer is a dev dependency
+        return _levenshtein(ref, hyp) / len(ref)
+
+
+def _levenshtein(a: list[str], b: list[str]) -> int:
+    previous = list(range(len(b) + 1))
+    for i, word in enumerate(a, 1):
+        current = [i]
+        for j, other in enumerate(b, 1):
+            cost = previous[j - 1] + (word != other)
+            current.append(min(previous[j] + 1, current[j - 1] + 1, cost))
+        previous = current
+    return previous[-1]
+
+
+def utterance_latencies(
+    boundaries: list[dict[str, float]], finals: list[tuple[float, Segment]], start_wall: float
+) -> list[int]:
+    """Match finals to sentence boundaries in order: wall(final) - wall(sentence end)."""
+    out: list[int] = []
+    for boundary, (wall, _segment) in zip(boundaries, finals, strict=False):
+        end_wall = start_wall + boundary["end_ms"] / 1000.0
+        out.append(max(0, round((wall - end_wall) * 1000)))
+    return out
+
+
+def read_reference(sample: Path) -> str:
+    path = sample.with_suffix(".txt")
+    if not path.is_file():
+        return ""
+    lines = path.read_text(encoding="utf-8").splitlines()
+    return " ".join(line.strip() for line in lines if line.strip() and not line.startswith("#"))
+
+
+def read_boundaries(sample: Path) -> list[dict[str, float]]:
+    path = sample.with_suffix(".json")
+    if not path.is_file():
+        return []
+    data = json.loads(path.read_text(encoding="utf-8"))
+    return list(data.get("sentences", []))
+
+
+def fmt_p(values: list[int]) -> str:
+    return f"{percentile(values, 50)}/{percentile(values, 95)}"
+
+
+async def run(sample: Path, stage: StageConfig, mode: str | None) -> int:
+    settings = load_settings(**({"stt_mode": mode} if mode else {}))
+    if settings.engine is not EngineKind.GEMINI:
+        raise ConfigError("smoke-stt needs ENGINE=gemini and a GEMINI_API_KEY in .env")
+    configure_logging(settings.log_level)
+    reference = read_reference(sample)
+    boundaries = read_boundaries(sample)
+
+    engine = GeminiSttEngine(settings)
+    interims: list[tuple[float, Segment]] = []
+    finals: list[tuple[float, Segment]] = []
+    start_wall = time.monotonic()
+
+    def emit(segment: Segment) -> None:
+        now = time.monotonic()
+        stamp = f"{segment.t_audio_ms / 1000:6.1f}s +{segment.latency_ms:4d}ms"
+        if segment.is_final:
+            finals.append((now, segment))
+            print(f"[final   {stamp}] {segment.text}")
+        else:
+            interims.append((now, segment))
+            print(f"[interim {stamp}] {segment.text[-70:]}", end="\r")
+
+    def on_state(state: StageState, detail: str | None) -> None:
+        print(f"\n[state] {state.value} {detail or ''}")
+
+    session = ManagedSttSession(stage, engine, emit=emit, on_state=on_state, rotate_seconds=540)
+    queue: asyncio.Queue[bytes | None] = asyncio.Queue(maxsize=50)
+    source = open_source(str(sample), ffmpeg_bin=settings.ffmpeg_bin, realtime=True, loop=False)
+
+    async def pump() -> None:
+        try:
+            async for chunk in source.chunks():
+                await queue.put(chunk)
+        finally:
+            await queue.put(None)
+
+    pump_task = asyncio.create_task(pump())
+    try:
+        await session.run(queue)
+    finally:
+        pump_task.cancel()
+        await source.close()
+
+    hypothesis = " ".join(segment.text for _, segment in finals)
+    wer = word_error_rate(reference, hypothesis) if reference else float("nan")
+    interim_lat = [s.latency_ms for _, s in interims]
+    final_lat = [s.latency_ms for _, s in finals]
+    utt = utterance_latencies(boundaries, finals, session.stream_start or start_wall)
+    stats = session.stats
+
+    print("\n=== smoke-stt summary ===")
+    print(f"sample: {sample}  mode: {settings.stt_mode.value}  model: {settings.gemini_stt_model}")
+    print(f"finals: {len(finals)}  interims: {len(interims)}  sessions: {stats.sessions_opened}")
+    print(f"errors: {stats.errors}  rotations: {stats.rotations}")
+    print(f"WER vs reference: {wer:.1%}" if reference else "WER: no reference transcript")
+    print(f"interim latency p50/p95: {fmt_p(interim_lat)} ms")
+    print(f"final latency p50/p95:   {fmt_p(final_lat)} ms")
+    if utt:
+        print(f"utterance-to-final p50/p95: {fmt_p(utt)} ms ({len(utt)} sentences)")
+    else:
+        print("utterance-to-final: no sentence boundaries (.json) next to the sample")
+    print(f"tokens: prompt={stats.prompt_tokens} response={stats.response_tokens}")
+    append_metrics_row(
+        sample=sample,
+        mode=settings.stt_mode.value,
+        finals=len(finals),
+        wer=wer,
+        interim_lat=interim_lat,
+        final_lat=final_lat,
+        utt=utt,
+        prompt_tokens=stats.prompt_tokens,
+        response_tokens=stats.response_tokens,
+    )
+    ok = len(finals) > 0 and (not reference or wer <= WER_LIMIT)
+    print("RESULT:", "PASS" if ok else f"FAIL (need >= 1 final and WER <= {WER_LIMIT:.0%})")
+    return 0 if ok else 1
+
+
+def append_metrics_row(
+    *,
+    sample: Path,
+    mode: str,
+    finals: int,
+    wer: float,
+    interim_lat: list[int],
+    final_lat: list[int],
+    utt: list[int],
+    prompt_tokens: int,
+    response_tokens: int,
+) -> None:
+    METRICS_FILE.parent.mkdir(parents=True, exist_ok=True)
+    if not METRICS_FILE.is_file():
+        METRICS_FILE.write_text(METRICS_INTRO + METRICS_HEADER, encoding="utf-8")
+    stamp = datetime.now(tz=UTC).strftime("%Y-%m-%d %H:%M")
+    utt_col = fmt_p(utt) if utt else "n/a"
+    row = (
+        f"| {stamp} | {sample.name} | {mode} | {finals} | {wer:.1%} | {fmt_p(interim_lat)} | "
+        f"{fmt_p(final_lat)} | {utt_col} | {prompt_tokens}/{response_tokens} |\n"
+    )
+    with METRICS_FILE.open("a", encoding="utf-8") as handle:
+        handle.write(row)
+
+
+def pick_stage(sample: Path, stage_id: str | None) -> StageConfig:
+    stages_path = Path("stages.yaml")
+    if stages_path.is_file():
+        stages = StagesFile.load(stages_path)
+        if stage_id:
+            stage = stages.by_id(stage_id)
+        else:
+            stage = next((s for s in stages.stages if Path(s.source).name == sample.name), None)
+        if stage is not None:
+            return stage
+    return StageConfig(id="smoke", name="Smoke", source=str(sample))
+
+
+def main(argv: Sequence[str] | None = None) -> int:
+    parser = argparse.ArgumentParser(prog="lenguaraz smoke-stt")
+    parser.add_argument("--sample", default="samples/en_kubernetes.wav")
+    parser.add_argument("--stage", default=None, help="stage id from stages.yaml")
+    parser.add_argument("--mode", choices=["SMART", "VERBATIM"], default=None)
+    args = parser.parse_args(argv)
+    sample = Path(args.sample)
+    if not sample.is_file():
+        print(f"sample not found: {sample}", file=sys.stderr)
+        return 2
+    try:
+        return asyncio.run(run(sample, pick_stage(sample, args.stage), args.mode))
+    except ConfigError as exc:
+        print(f"configuration error: {exc}", file=sys.stderr)
+        return 2
+
+
+if __name__ == "__main__":  # pragma: no cover
+    sys.exit(main())

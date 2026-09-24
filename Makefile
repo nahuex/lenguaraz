@@ -34,8 +34,8 @@ demo: ## Serve the bundled sample stages from stages.yaml (dry run: ENGINE=fake 
 web: ## Build the audience view into web/dist
 	cd web && $(NPM) ci --no-audit --no-fund && $(NPM) run build
 
-smoke-stt: ## Real Gemini call: transcribe a sample clip (feature 001; uses quota)
-	@echo "smoke-stt: not implemented yet (feature 001)"; exit 1
+smoke-stt: ## Real Gemini call: transcribe samples/en_kubernetes.wav, print WER/latency/tokens (uses quota)
+	$(UV) run lenguaraz smoke-stt $(SMOKE_ARGS)
 
 smoke-translate: ## Real Gemini call: translate a sample segment (feature 002; uses quota)
 	@echo "smoke-translate: not implemented yet (feature 002)"; exit 1
