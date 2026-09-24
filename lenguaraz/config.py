@@ -235,6 +235,14 @@ class Settings(BaseSettings):
     vad_threshold: int = Field(default=300, ge=1, le=20000)
     session_rotate_seconds: int = Field(default=540, ge=30, le=600)
     progressive_translation: bool = True
+    always_on_langs: str = "es"  # comma-separated short codes translated even with no listener
+    lang_grace_seconds: float = Field(default=10.0, ge=0, le=600)
+    lang_reconcile_debounce_ms: int = Field(default=250, ge=0, le=5000)
+    progressive_min_words: int = Field(default=6, ge=1, le=50)
+    progressive_debounce_ms: int = Field(default=600, ge=100, le=5000)
+    translate_max_output_tokens: int = Field(default=512, ge=16, le=8192)
+    gemini_translate_thinking: str = Field(default="minimal", pattern="^(minimal|low|medium|high)$")
+    translate_context_segments: int = Field(default=3, ge=0, le=10)
     log_transcripts: bool = False
     redis_url: str = ""
     stages_file: Path = Path("stages.yaml")
@@ -259,6 +267,15 @@ class Settings(BaseSettings):
     @property
     def dry_run(self) -> bool:
         return self.engine is EngineKind.FAKE
+
+    def always_on(self) -> list[str]:
+        """Short codes from ``ALWAYS_ON_LANGS`` (comma-separated), lower-cased, deduplicated."""
+        codes: list[str] = []
+        for raw in self.always_on_langs.split(","):
+            code = raw.strip().lower()
+            if code and code not in codes:
+                codes.append(code)
+        return codes
 
     def api_key(self) -> str:
         """The Gemini API key. Only the engine calls this; never log the result."""

@@ -27,7 +27,15 @@ editing files.
 | `VAD_SILENCE_MS` | integer 100–5000 | `500` | Silence after speech before the end-of-turn signal is sent (hybrid mode). |
 | `VAD_THRESHOLD` | integer 1–20000 | `300` | RMS level (16-bit scale) below which a 100 ms chunk counts as silence. Raise it for noisy rooms. |
 | `SESSION_ROTATE_SECONDS` | integer 30–600 | `540` | Live sessions last about 10 minutes; a new session is opened proactively after this many seconds (and on the server's `GoAway`). |
-| `PROGRESSIVE_TRANSLATION` | boolean | `true` | Translate the stable prefix of partial captions so translated lines appear before the sentence ends (feature 002). |
+| `PROGRESSIVE_TRANSLATION` | boolean | `true` | Translate a debounced partial caption so a provisional translated line appears before the sentence ends; the final replaces it. |
+| `PROGRESSIVE_MIN_WORDS` | integer 1–50 | `6` | Minimum words in a partial caption before it is translated progressively. |
+| `PROGRESSIVE_DEBOUNCE_MS` | integer 100–5000 | `600` | Minimum time between two progressive translations of the same utterance and language. |
+| `ALWAYS_ON_LANGS` | comma-separated short codes | `es` | Languages translated even when nobody is listening (so transcripts and exports exist), restricted to each stage's `targets`. |
+| `LANG_GRACE_SECONDS` | number 0–600 | `10` | A language stays active this long after its last listener leaves (Baqueano, D8). |
+| `LANG_RECONCILE_DEBOUNCE_MS` | integer 0–5000 | `250` | Documented upper bound for reacting to listener changes; the demand is evaluated at every caption, so a new listener is served by the next final. |
+| `TRANSLATE_CONTEXT_SEGMENTS` | integer 0–10 | `3` | Previous (source, translation) pairs sent as context to keep terminology and tense consistent. |
+| `TRANSLATE_MAX_OUTPUT_TOKENS` | integer 16–8192 | `512` | Cap on the translation length per segment. |
+| `GEMINI_TRANSLATE_THINKING` | `minimal` \| `low` \| `medium` \| `high` | `minimal` | Thinking level for the translation model; `minimal` gives the lowest latency and cost. |
 | `LOG_TRANSCRIPTS` | boolean | `false` | When `true`, caption text is written to the logs. Off by default for privacy. |
 | `REDIS_URL` | URL | *(empty)* | When set, the event bus uses Redis so several workers can share stages (feature 005). Empty = in-memory bus, single process. |
 | `STAGES_FILE` | path | `stages.yaml` | Path to the stages file. |
