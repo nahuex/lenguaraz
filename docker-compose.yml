@@ -1,0 +1,23 @@
+# SPDX-License-Identifier: Apache-2.0
+# One command to run: cp .env.example .env && docker compose up
+# Stages are configuration (stages.yaml); samples/ holds the bundled test audio.
+services:
+  lenguaraz:
+    build: .
+    image: lenguaraz:local
+    env_file: .env
+    environment:
+      HOST: 0.0.0.0
+      PORT: "8000"
+      STAGES_FILE: /app/stages.yaml
+    ports:
+      - "8000:8000"
+    volumes:
+      - ./stages.yaml:/app/stages.yaml:ro
+      - ./samples:/app/samples:ro
+    read_only: true
+    tmpfs:
+      - /tmp
+    security_opt:
+      - no-new-privileges:true
+    restart: unless-stopped

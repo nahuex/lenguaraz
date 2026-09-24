@@ -8,7 +8,7 @@ UV ?= uv
 NPM ?= npm
 COMPOSE ?= docker compose
 
-.PHONY: help verify dev up demo web smoke-stt smoke-translate simulate samples mvp-check \
+.PHONY: help verify dev up down logs demo web smoke-stt smoke-translate simulate samples mvp-check \
         license-check spdx-check docs-check fresh-clone-test hooks
 
 help: ## List targets
@@ -25,8 +25,14 @@ verify: ## ruff + mypy + pytest + frontend build + SPDX headers (must be green b
 dev: ## Run the API with auto-reload on http://127.0.0.1:8000 (ENGINE=fake for a dry run)
 	$(UV) run lenguaraz serve --host 127.0.0.1 --reload
 
-up: ## Start the whole stack with Docker Compose (feature 001)
-	@echo "up: not implemented yet (feature 001)"; exit 1
+up: ## Build and start the whole stack with Docker Compose on http://localhost:8000
+	$(COMPOSE) up --build -d && echo "Lenguaraz is starting: http://localhost:8000 (logs: make logs)"
+
+down: ## Stop the Docker Compose stack
+	$(COMPOSE) down
+
+logs: ## Follow the container logs
+	$(COMPOSE) logs -f
 
 demo: ## Serve the bundled sample stages from stages.yaml (dry run: ENGINE=fake make demo)
 	$(UV) run lenguaraz serve
@@ -43,11 +49,11 @@ smoke-translate: ## Real Gemini call: translate a sample segment (feature 002; u
 simulate: ## Replay N stages concurrently and write the scale report (feature 005)
 	@echo "simulate: not implemented yet (feature 005)"; exit 1
 
-samples: ## Generate EN/ES test audio with Gemini TTS into samples/ (feature 001; uses quota)
-	@echo "samples: not implemented yet (feature 001)"; exit 1
+samples: ## Generate EN/ES test audio + sentence boundaries with Gemini TTS into samples/ (uses quota)
+	$(UV) run lenguaraz samples $(SAMPLES_ARGS)
 
-mvp-check: ## Scripted check of every MVP gate (feature 001/002)
-	@echo "mvp-check: not implemented yet (feature 001/002)"; exit 1
+mvp-check: ## Scripted check of every MVP gate (fake engine by default; MVP_ARGS="--engine gemini" for real)
+	$(UV) run lenguaraz mvp-check $(MVP_ARGS)
 
 license-check: ## Fail on any dependency license outside the allowlist (feature 007)
 	@echo "license-check: not implemented yet (feature 007)"; exit 1
@@ -55,8 +61,8 @@ license-check: ## Fail on any dependency license outside the allowlist (feature 
 spdx-check: ## Every source file starts with the SPDX header (Constitution Art. XVII.A.4)
 	@sh scripts/spdx_check.sh
 
-docs-check: ## Validate doc links and config-key coverage (feature 008)
-	@echo "docs-check: not implemented yet (feature 008)"; exit 1
+docs-check: ## Every config key is documented and every relative doc link resolves
+	$(UV) run python scripts/docs_check.py
 
 fresh-clone-test: ## Clone the public repo into a temp dir and follow quickstart.md in dry-run mode (feature 008)
 	@echo "fresh-clone-test: not implemented yet (feature 008)"; exit 1
