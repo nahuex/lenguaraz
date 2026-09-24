@@ -18,10 +18,11 @@ from lenguaraz.api.ws import ConnectionLimiter, caption_socket
 from lenguaraz.bus.base import Bus
 from lenguaraz.bus.memory import MemoryBus
 from lenguaraz.config import Settings, StagesFile, load_settings
-from lenguaraz.engines import build_stt_engine
+from lenguaraz.engines import build_stt_engine, build_translation_engine
 from lenguaraz.ingest import open_source
 from lenguaraz.runner import SourceFactory, StageManager
 from lenguaraz.stt.base import SttEngine
+from lenguaraz.translate.base import TranslationEngine
 
 log = logging.getLogger("lenguaraz.api")
 
@@ -47,9 +48,11 @@ def create_app(
     source_factory: SourceFactory = open_source,
     metrics_interval: float = 5.0,
     web_dist: Path | None = None,
+    translator: TranslationEngine | None = None,
 ) -> FastAPI:
     stages = stages or StagesFile.load(settings.stages_file)
     engine = engine or build_stt_engine(settings)
+    translator = translator or build_translation_engine(settings)
     bus = bus or MemoryBus()
     manager = StageManager(
         stages,
@@ -58,6 +61,7 @@ def create_app(
         settings=settings,
         source_factory=source_factory,
         metrics_interval=metrics_interval,
+        translator=translator,
     )
     dist = web_dist or settings.web_dist or default_web_dist()
 

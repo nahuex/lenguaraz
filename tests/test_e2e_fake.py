@@ -42,3 +42,28 @@ def test_bundled_config_streams_captions_without_credentials(monkeypatch) -> Non
                             interim = event
                 assert interim is not None and final is not None, stage_id
                 assert final.lang == lang and final.text.endswith(".")
+
+
+def test_translated_captions_flow_for_always_on_and_on_demand_languages(monkeypatch) -> None:  # type: ignore[no-untyped-def]
+    """Spec 002 — AC-8/AC-9: `?lang=es` (always-on) and `?lang=pt` (on demand) on the EN stage."""
+    monkeypatch.chdir(ROOT)
+    stages = StagesFile.load(ROOT / "stages.yaml")
+    settings = Settings(_env_file=None, engine="fake", always_on_langs="es")
+    app = create_app(settings, stages, web_dist=ROOT / "web" / "dist")
+    with TestClient(app) as client:
+        for lang in ("es", "pt"):
+            with client.websocket_connect(f"/ws/main?lang={lang}") as ws:
+                assert isinstance(parse_event(ws.receive_text()), StatusEvent)
+                translated = None
+                deadline = time.monotonic() + 10
+                while translated is None and time.monotonic() < deadline:
+                    event = parse_event(ws.receive_text())
+                    if isinstance(event, CaptionEvent) and event.is_final and event.lang == lang:
+                        translated = event
+                assert translated is not None, lang
+                assert translated.text.startswith(f"[{lang}] ")
+                assert translated.original and translated.original != translated.text
+                assert translated.source_lang == "en" and translated.degraded is False
+        rows = {row["id"]: row for row in client.get("/api/stages").json()}
+        assert "es" in rows["main"]["active_languages"]
+        assert rows["main"]["translation_tokens"]["es"]["calls"] >= 1

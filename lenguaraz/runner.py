@@ -21,6 +21,8 @@ from lenguaraz.metrics import StageMetrics
 from lenguaraz.models import CaptionEvent, MetricsEvent, StageState, StatusEvent
 from lenguaraz.stt.base import SttEngine
 from lenguaraz.stt.session import ManagedSttSession, Segment
+from lenguaraz.translate.base import TranslationEngine
+from lenguaraz.translate.fanout import TranslationFanout
 
 log = logging.getLogger("lenguaraz.runner")
 
@@ -38,9 +40,12 @@ class StageRunner:
         settings: Settings,
         source_factory: SourceFactory = open_source,
         metrics_interval: float = 5.0,
+        translator: TranslationEngine | None = None,
     ) -> None:
         self.stage = stage
         self._engine = engine
+        self._translator = translator
+        self.fanout: TranslationFanout | None = None
         self._bus = bus
         self._settings = settings
         self._source_factory = source_factory
@@ -90,6 +95,14 @@ class StageRunner:
             ),
             vad_threshold=self._settings.vad_threshold,
         )
+        if self._translator is not None and self.stage.targets:
+            self.fanout = TranslationFanout(
+                self.stage,
+                self._translator,
+                self._bus,
+                self._settings,
+                on_status=self._on_translation_status,
+            )
         source: AudioSource | None = None
         pump: asyncio.Task[None] | None = None
         ticker = asyncio.create_task(self._metrics_loop(), name=f"metrics-{self.stage.id}")
@@ -121,6 +134,9 @@ class StageRunner:
             if source is not None:
                 with contextlib.suppress(Exception):
                     await source.close()
+            if self.fanout is not None:
+                with contextlib.suppress(Exception):
+                    await self.fanout.stop()
 
     async def _pump(self, source: AudioSource, queue: asyncio.Queue[bytes | None]) -> None:
         try:
@@ -139,6 +155,10 @@ class StageRunner:
                 await queue.put(None)
 
     # -- events -------------------------------------------------------------------------
+
+    def _on_translation_status(self, detail: str) -> None:
+        """Translation trouble is reported on the current state; STT keeps flowing."""
+        self._set_state(self.state, detail)
 
     def _on_session_state(self, state: StageState, detail: str | None) -> None:
         if state is StageState.STOPPED and self._source_error:
@@ -165,20 +185,20 @@ class StageRunner:
                 lang,
                 segment.text,
             )
-        self._bus.publish(
-            self.stage.id,
-            CaptionEvent(
-                stage_id=self.stage.id,
-                seq=segment.seq,
-                lang=lang,
-                source_lang=lang,
-                is_final=segment.is_final,
-                text=segment.text,
-                original=None,
-                t_audio_ms=segment.t_audio_ms,
-                latency_ms=segment.latency_ms,
-            ),
+        event = CaptionEvent(
+            stage_id=self.stage.id,
+            seq=segment.seq,
+            lang=lang,
+            source_lang=lang,
+            is_final=segment.is_final,
+            text=segment.text,
+            original=None,
+            t_audio_ms=segment.t_audio_ms,
+            latency_ms=segment.latency_ms,
         )
+        self._bus.publish(self.stage.id, event)
+        if self.fanout is not None:
+            self.fanout.on_caption(event)
 
     def metrics_event(self) -> MetricsEvent:
         stats = self.session.stats if self.session else None
@@ -214,6 +234,8 @@ class StageRunner:
             "p50_ms": self.metrics.finals.p50,
             "p95_ms": self.metrics.finals.p95,
             "interim_p95_ms": self.metrics.interims.p95,
+            "active_languages": self.fanout.active_languages() if self.fanout else [],
+            "translation_tokens": self.fanout.usage() if self.fanout else {},
         }
 
 
@@ -227,6 +249,7 @@ class StageManager:
         settings: Settings,
         source_factory: SourceFactory = open_source,
         metrics_interval: float = 5.0,
+        translator: TranslationEngine | None = None,
     ) -> None:
         self.bus = bus
         self.settings = settings
@@ -238,6 +261,7 @@ class StageManager:
                 settings=settings,
                 source_factory=source_factory,
                 metrics_interval=metrics_interval,
+                translator=translator,
             )
             for stage in stages.stages
         }
