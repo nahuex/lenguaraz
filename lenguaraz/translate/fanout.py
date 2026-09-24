@@ -1,0 +1,239 @@
+# SPDX-License-Identifier: Apache-2.0
+"""Parla — translate every final caption into each active target language.
+
+One ordered worker per (stage, language): finals are translated sequentially per language,
+so captions never arrive out of order. Pass-through is inherent: a listener whose language
+equals the caption's source language already receives the original from the bus. Errors
+retry with backoff; a persistent failure publishes the caption with ``degraded=True`` and the
+original text, and reports a status detail, while STT captions keep flowing (FR-002-07).
+Progressive translation (FR-002-06) translates a debounced partial hypothesis and publishes
+it as an interim caption that the final later replaces (same ``seq``).
+"""
+
+from __future__ import annotations
+
+import asyncio
+import contextlib
+import logging
+import time
+from collections import deque
+from collections.abc import Awaitable, Callable
+from dataclasses import dataclass, field
+
+from lenguaraz.bus.base import Bus
+from lenguaraz.config import Settings, StageConfig, short_code
+from lenguaraz.models import CaptionEvent
+from lenguaraz.translate.base import (
+    TranslationEngine,
+    TranslationError,
+    TranslationRequest,
+    TranslationUsage,
+)
+from lenguaraz.translate.demand import LanguageDemand
+
+log = logging.getLogger("lenguaraz.translate")
+
+QUEUE_SIZE = 100
+BACKOFF_SECONDS = (0.5, 1.0, 2.0)
+StatusCallback = Callable[[str], None]
+SleepFn = Callable[[float], Awaitable[None]]
+
+
+@dataclass(slots=True)
+class _Progressive:
+    last_text: str = ""
+    last_time: float = -1e9
+    task: asyncio.Task[None] | None = None
+
+
+@dataclass(slots=True)
+class _Language:
+    queue: asyncio.Queue[CaptionEvent]
+    worker: asyncio.Task[None] | None = None
+    context: deque[tuple[str, str]] = field(default_factory=lambda: deque(maxlen=3))
+    usage: TranslationUsage = field(default_factory=TranslationUsage)
+    progressive: _Progressive = field(default_factory=_Progressive)
+    dropped: int = 0
+
+
+class TranslationFanout:
+    def __init__(
+        self,
+        stage: StageConfig,
+        engine: TranslationEngine,
+        bus: Bus,
+        settings: Settings,
+        *,
+        on_status: StatusCallback | None = None,
+        clock: Callable[[], float] = time.monotonic,
+        sleep: SleepFn = asyncio.sleep,
+    ) -> None:
+        self._stage = stage
+        self._engine = engine
+        self._bus = bus
+        self._settings = settings
+        self._on_status = on_status
+        self._clock = clock
+        self._sleep = sleep
+        self._languages: dict[str, _Language] = {}
+        self.demand = LanguageDemand(
+            [code for code in settings.always_on() if code in stage.targets],
+            settings.lang_grace_seconds,
+            clock=clock,
+        )
+        self._log = logging.LoggerAdapter(log, {"stage_id": stage.id, "component": "Parla"})
+
+    # -- demand (Baqueano) ---------------------------------------------------------------
+
+    def active_languages(self) -> list[str]:
+        listening = getattr(self._bus, "languages_with_listeners", None)
+        if listening is not None:
+            self.demand.observe(listening(self._stage.id))
+        return self.demand.active(candidates=self._stage.targets)
+
+    def usage(self) -> dict[str, dict[str, int]]:
+        return {code: lang.usage.as_dict() for code, lang in self._languages.items()}
+
+    # -- entry point -----------------------------------------------------------------------
+
+    def on_caption(self, event: CaptionEvent) -> None:
+        """Called after the original caption was published on the bus."""
+        source = short_code(event.lang)
+        targets = [code for code in self.active_languages() if code != source]
+        if not targets:
+            return
+        if event.is_final:
+            for code in targets:
+                self._enqueue(code, event)
+        elif self._settings.progressive_translation:
+            for code in targets:
+                self._maybe_progressive(code, event)
+
+    async def stop(self) -> None:
+        tasks: list[asyncio.Task[None]] = []
+        for lang in self._languages.values():
+            if lang.worker is not None:
+                tasks.append(lang.worker)
+            if lang.progressive.task is not None:
+                tasks.append(lang.progressive.task)
+        for task in tasks:
+            task.cancel()
+        for task in tasks:
+            with contextlib.suppress(asyncio.CancelledError, Exception):
+                await task
+        self._languages.clear()
+
+    # -- finals: ordered worker per language -------------------------------------------------
+
+    def _language(self, code: str) -> _Language:
+        lang = self._languages.get(code)
+        if lang is None:
+            lang = _Language(queue=asyncio.Queue(maxsize=QUEUE_SIZE))
+            lang.context = deque(maxlen=max(0, self._settings.translate_context_segments))
+            self._languages[code] = lang
+        if lang.worker is None or lang.worker.done():
+            lang.worker = asyncio.create_task(self._worker(code, lang), name=f"parla-{code}")
+        return lang
+
+    def _enqueue(self, code: str, event: CaptionEvent) -> None:
+        lang = self._language(code)
+        if lang.queue.full():
+            with contextlib.suppress(asyncio.QueueEmpty):
+                lang.queue.get_nowait()  # keep the newest finals when hopelessly behind
+                lang.dropped += 1
+        lang.queue.put_nowait(event)
+
+    async def _worker(self, code: str, lang: _Language) -> None:
+        while True:
+            event = await lang.queue.get()
+            await self._translate_and_publish(code, lang, event, is_final=True)
+
+    # -- progressive translation of partials --------------------------------------------------
+
+    def _maybe_progressive(self, code: str, event: CaptionEvent) -> None:
+        lang = self._language(code)
+        state = lang.progressive
+        if len(event.text.split()) < self._settings.progressive_min_words:
+            return
+        if event.text == state.last_text:
+            return
+        now = self._clock()
+        if now - state.last_time < self._settings.progressive_debounce_ms / 1000.0:
+            return
+        if state.task is not None and not state.task.done():
+            return
+        state.last_text = event.text
+        state.last_time = now
+        state.task = asyncio.create_task(
+            self._translate_and_publish(code, lang, event, is_final=False),
+            name=f"parla-progressive-{code}",
+        )
+
+    # -- one translation ---------------------------------------------------------------------
+
+    async def _translate_and_publish(
+        self, code: str, lang: _Language, event: CaptionEvent, *, is_final: bool
+    ) -> None:
+        request = TranslationRequest(
+            text=event.text,
+            source_lang=event.lang,
+            target_lang=code,
+            glossary=tuple(self._stage.glossary),
+            context=tuple(lang.context),
+            talk_title=self._stage.talk.title,
+            talk_abstract=self._stage.talk.abstract,
+        )
+        started = self._clock()
+        last_error: Exception | None = None
+        for attempt, delay in enumerate((*BACKOFF_SECONDS, None), start=1):
+            try:
+                outcome = await self._engine.translate(request)
+            except TranslationError as exc:
+                last_error = exc
+                if not exc.retryable or delay is None:
+                    break
+                self._log.warning("translation to %s failed (attempt %d): %s", code, attempt, exc)
+                await self._sleep(delay)
+                continue
+            except asyncio.CancelledError:
+                raise
+            except Exception as exc:
+                last_error = exc
+                self._log.exception("translation engine crashed")
+                break
+            lang.usage.add(outcome.usage)
+            if is_final:
+                lang.context.append((event.text, outcome.text))
+            self._publish(code, event, outcome.text, is_final=is_final, started=started)
+            return
+        detail = f"translation to {code} failed: {last_error}"
+        self._log.error(detail)
+        if self._on_status is not None:
+            self._on_status(detail)
+        self._publish(code, event, "", is_final=is_final, started=started, degraded=True)
+
+    def _publish(
+        self,
+        code: str,
+        event: CaptionEvent,
+        text: str,
+        *,
+        is_final: bool,
+        started: float,
+        degraded: bool = False,
+    ) -> None:
+        self._bus.publish(
+            self._stage.id,
+            CaptionEvent(
+                stage_id=self._stage.id,
+                seq=event.seq,
+                lang=code,
+                source_lang=short_code(event.lang),
+                is_final=is_final,
+                text=text,
+                original=event.text,
+                t_audio_ms=event.t_audio_ms,
+                latency_ms=max(0, round((self._clock() - started) * 1000)),
+                degraded=degraded,
+            ),
+        )
