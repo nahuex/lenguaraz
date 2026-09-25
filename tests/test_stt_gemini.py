@@ -193,3 +193,16 @@ def test_parse_time_left() -> None:
 def test_engine_factory_picks_gemini_without_creating_a_client() -> None:
     engine = build_stt_engine(settings())
     assert isinstance(engine, GeminiSttEngine)
+
+
+def test_websocket_close_codes_are_retryable() -> None:
+    class Closed(Exception):
+        def __init__(self, code: int, message: str) -> None:
+            super().__init__(message)
+            self.code = code
+            self.message = message
+
+    aborted = classify_error(Closed(1008, "1008 None. The operation was aborted."))
+    assert aborted.retryable is True
+    assert classify_error(Closed(1011, "1011 internal error")).retryable is True
+    assert classify_error(Closed(403, "forbidden")).retryable is False

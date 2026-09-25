@@ -65,6 +65,10 @@ def classify_error(exc: BaseException) -> SttEvent:
     status = getattr(exc, "status", None)
     message = getattr(exc, "message", None) or str(exc)
     retryable = code is None or code in RETRYABLE_CODES
+    if isinstance(code, int) and 1000 <= code <= 4999:
+        # WebSocket close codes (e.g. 1008 "The operation was aborted" after ~60 s without
+        # audio, 1011 server error): the session is gone, reopening it is the right move.
+        retryable = True
     if message.strip().startswith("1000"):
         message = f"connection closed ({message.strip()})"
     if code == 429:
