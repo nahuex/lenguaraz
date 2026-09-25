@@ -2,7 +2,7 @@
 # Lenguaraz — single image: built audience view + API. Non-root, ffmpeg as a separate program.
 
 # --- stage 1: audience view -------------------------------------------------------------
-FROM node:24-alpine AS web
+FROM node:25-alpine AS web
 WORKDIR /web
 COPY web/package.json web/package-lock.json ./
 RUN npm ci --no-audit --no-fund
