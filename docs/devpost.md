@@ -39,8 +39,14 @@ who travelled with the expeditions across the Pampas.
   translation fails, and reopens a session that goes silent while speech keeps flowing.
 - Builds a first glossary automatically from the talk title and abstract with Gemini
   structured output (**auto-glossary**), merged after the operator's manual list.
-- Runs many stages in one process (10 stages ≈ 10 % of one core), any audio ffmpeg can read
-  (SRT, RTMP, HLS, files), non-root read-only container, and a credential-free dry-run mode.
+- Runs many stages in one process (10 stages ≈ 10 % of one core) and serves 1,000 concurrent
+  viewers per instance with a p95 fan-out spread of 58 ms; any audio ffmpeg can read (SRT, RTMP, HLS,
+  files), HTTPS with your own certificate or automatic Let's Encrypt via a Caddy profile, non-root
+  read-only container, and a credential-free dry-run mode.
+- Keeps captions flowing on bad API days: if the server never commits a sentence, the last partial
+  is promoted to a final after 3 s; a 429 pauses translation for the server's hint and shows the original.
+- Audience, overlay and operator pages on an accessible design system (shadcn/ui, Radix), with
+  automated axe checks, dark/light/high-contrast themes and event branding from a YAML file.
 
 ## How we built it
 
@@ -72,7 +78,7 @@ latency), `make smoke-translate`, `make simulate` (10 stages, CPU/RSS/cost) and
 Measured numbers instead of promises: WER 3.2 % (EN) / 4.3 % (ES) on technical clips,
 utterance-to-final p50 ≈ 0.9 s, translation time-to-first-token ≈ 0.6 s, 0 lost / 0
 duplicated sentences across forced rotations, USD 0.495 per stage-hour, ten stages at 10 %
-CPU. And a documentation set that lets a conference we have never met deploy it alone,
+CPU, 1,000 viewers on one instance with no drops (p95 spread 58 ms). And a documentation set that lets a conference we have never met deploy it alone,
 verified by `make fresh-clone-test`.
 
 ## What we learned
