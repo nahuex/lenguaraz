@@ -73,7 +73,9 @@ Recorrido completo, camino de desarrollo y resolución de problemas:
 **Requisitos:** Docker (o Python 3.12 + [uv](https://docs.astral.sh/uv/) + Node 24 + ffmpeg
 para el camino de desarrollo). **Credenciales:** una API key de Gemini de
 [Google AI Studio](https://aistudio.google.com/), guardada del lado del servidor en `.env`;
-usá un proyecto con facturación habilitada para eventos reales. **Modelos** (todos
+usá un proyecto con facturación habilitada para eventos reales (las cuentas nuevas de AI Studio
+son prepagas: cargá al menos USD 5 de créditos o cada llamada responde `402`; ver
+[docs/troubleshooting.md](docs/troubleshooting.md)). **Modelos** (todos
 configurables): `gemini-3.5-transcribe-live` (subtítulos), `gemini-3.5-flash-lite`
 (traducción), `gemini-3.8-flash-lite-tts` (audio de prueba).
 
