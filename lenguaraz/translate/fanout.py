@@ -206,7 +206,9 @@ class TranslationFanout:
         last_error: Exception | None = None
         for attempt, delay in enumerate((*BACKOFF_SECONDS, None), start=1):
             try:
-                outcome = await self._engine.translate(request)
+                outcome = await asyncio.wait_for(
+                    self._engine.translate(request), self._settings.translate_timeout_seconds
+                )
             except TranslationError as exc:
                 if exc.code == 429:
                     self._rate_limited(code, lang, exc)
@@ -222,6 +224,11 @@ class TranslationFanout:
                 continue
             except asyncio.CancelledError:
                 raise
+            except TimeoutError:
+                last_error = TranslationError(
+                    f"timed out after {self._settings.translate_timeout_seconds:.0f}s"
+                )
+                break  # a slow model must not hold the whole language queue: degrade now
             except Exception as exc:
                 last_error = exc
                 self._log.exception("translation engine crashed")

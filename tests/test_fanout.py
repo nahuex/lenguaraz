@@ -207,3 +207,16 @@ async def test_rate_limit_pauses_translation_and_shows_the_original(bus: MemoryB
     assert [(e.text, e.degraded) for e in events] == [("[es] Fourth.", False)]
     assert len(translator.requests) == 2
     await fanout.stop()
+
+
+async def test_slow_translation_times_out_and_degrades_without_blocking(bus: MemoryBus) -> None:
+    translator = FakeTranslator(delay=5.0)
+    fanout = TranslationFanout(
+        STAGE, translator, bus, settings(translate_timeout_seconds=0.2), sleep=fast_sleep
+    )
+    es = bus.subscribe("main", lang="es")
+    fanout.on_caption(caption(1, "Slow one."))
+    events = await drain(es, 1.0)
+    assert [(e.text, e.degraded) for e in events] == [("Slow one.", True)]
+    assert len(translator.requests) == 1  # no retries on a timeout
+    await fanout.stop()
