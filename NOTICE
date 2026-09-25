@@ -16,6 +16,9 @@ into THIRD_PARTY_LICENSES.md by `make license-check`.
 The Gemini API is a hosted Google service governed by its own terms; the code in
 this repository that calls it is open source under the License above.
 
+This product includes UI components derived from shadcn/ui (https://ui.shadcn.com),
+licensed under the MIT License, Copyright (c) 2023 shadcn.
+
 Product and company names mentioned in this repository (Google, Gemini, Gemma,
 Nerdearla, OBS, vMix and others) may be trademarks of their respective owners.
 Trademarks and logos are not covered by the License and are not included here.

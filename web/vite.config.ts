@@ -1,4 +1,5 @@
 // SPDX-License-Identifier: Apache-2.0
+import path from 'node:path';
 import { defineConfig } from 'vitest/config';
 import react from '@vitejs/plugin-react';
 import tailwindcss from '@tailwindcss/vite';
@@ -9,6 +10,12 @@ const BACKEND = 'http://127.0.0.1:8000';
 
 export default defineConfig({
   plugins: [react(), tailwindcss()],
+  resolve: {
+    // "@/..." resolves to src/ (shadcn/ui convention; mirrored in tsconfig paths).
+    alias: {
+      '@': path.resolve(import.meta.dirname, './src'),
+    },
+  },
   server: {
     proxy: {
       '/api': BACKEND,

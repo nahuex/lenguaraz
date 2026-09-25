@@ -116,6 +116,19 @@ live-captioning platforms, in the UI, the routes, the docs and the code.
 Routes are `/live/{stage}`, `/overlay/{stage}` and `/admin`; the caption WebSocket is
 `/ws/{stage}` and the JSON API lives under `/api/`. Stage ids are ASCII.
 
+## UI components
+
+The web pages are built on [shadcn/ui](https://ui.shadcn.com) primitives (MIT, Radix-based)
+copied into `web/src/components/ui/`. Compose those (`Button`, `Card`, `Badge`, `RadioGroup`,
+`ToggleGroup`, `Switch`, `Table`, `Input`, `Label`, `Alert`, `Skeleton`, `Separator`) and
+`lucide-react` icons; do not hand-roll buttons, inputs or toggles with raw Tailwind, and do
+not hardcode colours: use the tokens in `web/src/index.css` (see the Theming section of
+[`docs/customization.md`](docs/customization.md#theming)). A missing primitive is added with
+`npx shadcn@latest add <name>` inside `web/`, then gets the SPDX line and the shadcn
+attribution comment on top. Every control keeps keyboard operation, a visible focus ring and
+an accessible name; `web/src/test/a11y.test.tsx` runs axe on the shared components and the
+Overlay page (`web/src/pages/Overlay.tsx`, `overlay.css`) stays on its own transparent CSS.
+
 ## Proposing changes
 
 - **Issues** for bugs (steps, expected vs actual, engine and version from `/healthz`) and for

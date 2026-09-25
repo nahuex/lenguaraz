@@ -1,10 +1,10 @@
 // SPDX-License-Identifier: Apache-2.0
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
-import { act, render, screen } from '@testing-library/react';
+import { act, fireEvent, render, screen, within } from '@testing-library/react';
 import { MemoryRouter, Route, Routes } from 'react-router-dom';
 import { LiveCaptions } from './LiveCaptions';
 import type { Stage } from '../lib/api';
-import type { ServerEvent, WebSocketLike } from '../lib/captions';
+import type { CaptionEvent, ServerEvent, WebSocketLike } from '../lib/captions';
 
 /** In-memory WebSocket stand-in, driven from the test (same approach as Overlay.test.tsx). */
 class FakeSocket implements WebSocketLike {
@@ -51,6 +51,20 @@ const STAGE: Stage = {
   listeners: 3,
   dry_run: false,
 };
+
+function finalCaption(seq: number): CaptionEvent {
+  return {
+    type: 'caption',
+    stage_id: 'main',
+    seq,
+    lang: 'es',
+    source_lang: 'en',
+    is_final: true,
+    text: `line ${seq}`,
+    t_audio_ms: seq * 1000,
+    latency_ms: 800,
+  };
+}
 
 function renderPage(path: string) {
   return render(
@@ -115,6 +129,57 @@ describe('LiveCaptions', () => {
     expect(screen.getByText('Captions have ended for this stage.')).toBeInTheDocument();
   });
 
+  it('exposes the stage name as the heading and the connection state as a status badge', async () => {
+    renderPage('/live/main?lang=es');
+    expect(
+      await screen.findByRole('heading', { level: 1, name: 'Main Stage' }),
+    ).toBeInTheDocument();
+
+    const badge = screen.getByText('Connecting…');
+    expect(badge).toHaveAttribute('role', 'status');
+
+    act(() => {
+      FakeSocket.instances[0]?.open();
+    });
+    expect(screen.getByText('Live')).toHaveAttribute('role', 'status');
+
+    // The status banner is a polite status, not an alert, and the stage badge sits inside it.
+    const banner = screen
+      .getByText('Captions are running with reduced quality.')
+      .closest('[role="status"]');
+    expect(banner).not.toBeNull();
+    expect(within(banner as HTMLElement).getByText('DEGRADED')).toBeInTheDocument();
+
+    // The language picker lives on the page with its accessible name.
+    expect(screen.getByRole('radiogroup', { name: 'Caption language' })).toBeInTheDocument();
+    expect(screen.getByRole('radio', { name: 'Spanish' })).toBeChecked();
+  });
+
+  it('lets the audience choose how many caption lines to show', () => {
+    renderPage('/live/main?lang=es');
+    const socket = FakeSocket.instances[0];
+    act(() => {
+      socket?.open();
+      for (let seq = 1; seq <= 6; seq += 1) socket?.message(finalCaption(seq));
+    });
+
+    const region = screen.getByRole('region', { name: 'Captions' });
+    expect(
+      within(region)
+        .getAllByText(/^line \d$/)
+        .map((el) => el.textContent),
+    ).toEqual(['line 4', 'line 5', 'line 6']);
+
+    const lines = screen.getByRole('radiogroup', { name: 'Caption lines' });
+    expect(within(lines).getByRole('radio', { name: '3 lines' })).toBeChecked();
+    fireEvent.click(within(lines).getByRole('radio', { name: '5 lines' }));
+    expect(within(lines).getByRole('radio', { name: '5 lines' })).toBeChecked();
+    expect(within(region).getAllByText(/^line \d$/)).toHaveLength(5);
+
+    // The display settings sit next to it.
+    expect(screen.getByRole('group', { name: 'Display settings' })).toBeInTheDocument();
+  });
+
   it('turns p50/p95 into a plain caption-delay line and hides it without data', () => {
     renderPage('/live/main?lang=es');
     const socket = FakeSocket.instances[0];
@@ -145,5 +210,15 @@ describe('LiveCaptions', () => {
       screen.getByText('Caption delay: about 0.9 s (typical), 1.6 s (peak)'),
     ).toBeInTheDocument();
     expect(screen.queryByText(/rotations|errors|p50|p95/)).toBeNull();
+  });
+
+  it('reports an unknown stage as an alert with a way back', async () => {
+    renderPage('/live/nope?lang=es');
+    const alert = await screen.findByRole('alert');
+    expect(alert).toHaveTextContent('Unknown stage “nope”.');
+    expect(within(alert).getByRole('link', { name: 'Back to the stage list' })).toHaveAttribute(
+      'href',
+      '/',
+    );
   });
 });

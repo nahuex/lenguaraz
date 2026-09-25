@@ -1,7 +1,25 @@
 // SPDX-License-Identifier: Apache-2.0
 import { useCallback, useEffect, useId, useState, type FormEvent, type ReactNode } from 'react';
 import { Link } from 'react-router-dom';
-import { StateBadge } from '../components/StateBadge';
+import { ArrowLeft, CircleAlert, LogIn, LogOut, Play, Square } from 'lucide-react';
+import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
+import { Badge } from '@/components/ui/badge';
+import { Button } from '@/components/ui/button';
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
+import { Input } from '@/components/ui/input';
+import { Label } from '@/components/ui/label';
+import { Skeleton } from '@/components/ui/skeleton';
+import {
+  Table,
+  TableBody,
+  TableCaption,
+  TableCell,
+  TableFooter,
+  TableHead,
+  TableHeader,
+  TableRow,
+} from '@/components/ui/table';
+import { cn } from '@/lib/utils';
 import {
   ApiError,
   exportTranscript,
@@ -12,6 +30,7 @@ import {
   type AdminStage,
   type ExportFormat,
   type Health,
+  type StageState,
   type TranslationTokens,
 } from '../lib/api';
 import { deriveShortCode, languageLabel } from '../lib/lang';
@@ -181,31 +200,56 @@ const HEADERS = [
   'Export',
 ] as const;
 
+/**
+ * Solid badge colours per stage state; each pair keeps >= 4.5:1 on its own so the badge
+ * reads the same in every theme (the same pairs as components/StateBadge).
+ */
+const STATE_BADGE: Record<StageState, string> = {
+  LIVE: 'bg-[#22c55e] text-[#052e16]',
+  STARTING: 'bg-[#f59e0b] text-[#451a03]',
+  ROTATING: 'bg-[#f59e0b] text-[#451a03]',
+  DEGRADED: 'bg-[#f97316] text-[#431407]',
+  IDLE: 'bg-[#9ca3af] text-[#111827]',
+  STOPPED: 'bg-[#9ca3af] text-[#111827]',
+};
+
+/*
+ * Below the `md` breakpoint the table turns into a stack of cards: the header row is
+ * hidden, every row is a card and every cell is a labelled block. The explicit ARIA roles
+ * keep the table semantics that browsers drop when the CSS display changes.
+ */
+const ROW =
+  'mb-4 block rounded-xl border-b-0 bg-card p-3 ring-1 ring-foreground/10 md:mb-0 md:table-row md:rounded-none md:border-b md:p-0 md:ring-0';
+const CELL = 'block px-0 py-1 whitespace-normal md:table-cell md:px-3 md:py-2 md:align-top';
+const CELL_LABEL =
+  'mr-2 inline-block min-w-[9rem] text-xs font-semibold uppercase tracking-wide text-muted-foreground md:hidden';
+const SELECT =
+  'h-7 rounded-md border border-input bg-transparent px-2 text-[0.8rem] text-foreground outline-none focus-visible:border-ring focus-visible:ring-3 focus-visible:ring-ring/50 disabled:opacity-50 dark:bg-input/30';
+
 interface CellProps {
   label: string;
   children: ReactNode;
   className?: string;
+  /** Render as the row header (`th scope="row"`): the stage name identifies the row. */
+  header?: boolean;
 }
 
 /** Table cell that becomes a labelled block on phones (the table turns into cards). */
-function Cell({ label, children, className = '' }: CellProps) {
-  return (
-    <td
-      role="cell"
-      className={`block py-1 md:table-cell md:px-3 md:py-2 md:align-top ${className}`}
-    >
-      <span className="mr-2 inline-block min-w-[9rem] text-xs font-semibold uppercase tracking-wide text-ink-muted md:hidden">
-        {label}
-      </span>
+function Cell({ label, children, className, header = false }: CellProps) {
+  const classes = cn(CELL, className);
+  const tag = <span className={CELL_LABEL}>{label}</span>;
+  return header ? (
+    <TableHead scope="row" role="rowheader" className={cn('h-auto font-normal', classes)}>
+      {tag}
       {children}
-    </td>
+    </TableHead>
+  ) : (
+    <TableCell role="cell" className={classes}>
+      {tag}
+      {children}
+    </TableCell>
   );
 }
-
-const BUTTON =
-  'rounded-md border px-2.5 py-1 text-sm font-medium disabled:cursor-not-allowed disabled:opacity-50';
-const BUTTON_PRIMARY = `${BUTTON} border-accent bg-accent text-accent-ink hover:opacity-90`;
-const BUTTON_PLAIN = `${BUTTON} border-line bg-surface-raised text-ink hover:border-accent`;
 
 export function Admin() {
   const [token, setToken] = useState<string | null>(() => readToken());
@@ -311,16 +355,19 @@ export function Admin() {
         };
 
   return (
-    <div className="flex flex-col gap-5">
+    <div className="flex flex-col gap-6">
       <nav aria-label="Breadcrumb" className="text-sm">
-        <Link to="/" className="text-accent underline">
-          ← All stages
-        </Link>
+        <Button asChild variant="link" size="sm" className="h-auto px-0">
+          <Link to="/">
+            <ArrowLeft aria-hidden="true" />
+            All stages
+          </Link>
+        </Button>
       </nav>
 
       <header className="flex flex-col gap-2">
         <h1 className="text-2xl font-bold tracking-tight">Operator dashboard</h1>
-        <p className="text-sm text-ink-muted">
+        <p className="text-sm text-muted-foreground">
           {health !== null
             ? `Backend: engine ${health.engine} · ${health.stages} ${
                 health.stages === 1 ? 'stage' : 'stages'
@@ -331,92 +378,106 @@ export function Admin() {
         </p>
       </header>
 
-      <form
-        onSubmit={connect}
-        aria-label="Admin sign-in"
-        className="flex flex-wrap items-end gap-3 rounded-lg border border-line bg-surface-raised p-4"
-      >
-        <div className="flex min-w-0 flex-1 flex-col gap-1">
-          <label htmlFor={tokenInputId} className="text-sm font-semibold text-ink-muted">
-            Admin token
-          </label>
-          <input
-            id={tokenInputId}
-            type="password"
-            autoComplete="off"
-            value={draft}
-            onChange={(event) => setDraft(event.target.value)}
-            disabled={token !== null}
-            placeholder={token !== null ? 'Signed in' : undefined}
-            aria-describedby={tokenHintId}
-            className="w-full rounded-md border border-line bg-surface px-3 py-1.5 text-ink disabled:opacity-60"
-          />
-          <p id={tokenHintId} className="text-xs text-ink-muted">
+      <Card>
+        <CardHeader>
+          <CardTitle>Operator access</CardTitle>
+          <CardDescription id={tokenHintId}>
             {"The ADMIN_TOKEN value from the server's .env"}
-          </p>
-        </div>
-        {token === null ? (
-          <button type="submit" className={BUTTON_PRIMARY}>
-            Sign in
-          </button>
-        ) : (
-          <button type="button" className={BUTTON_PLAIN} onClick={() => clearToken(null)}>
-            Sign out
-          </button>
-        )}
-        {authError !== null && (
-          <p role="alert" className="w-full text-sm font-semibold">
-            {authError}
-          </p>
-        )}
-      </form>
+          </CardDescription>
+        </CardHeader>
+        <CardContent className="flex flex-col gap-3">
+          <form
+            onSubmit={connect}
+            aria-label="Admin sign-in"
+            className="flex flex-wrap items-end gap-3"
+          >
+            <div className="grid min-w-0 flex-1 gap-2">
+              <Label htmlFor={tokenInputId}>Admin token</Label>
+              <Input
+                id={tokenInputId}
+                type="password"
+                autoComplete="off"
+                value={draft}
+                onChange={(event) => setDraft(event.target.value)}
+                disabled={token !== null}
+                placeholder={token !== null ? 'Signed in' : undefined}
+                aria-describedby={tokenHintId}
+              />
+            </div>
+            {token === null ? (
+              <Button type="submit">
+                <LogIn aria-hidden="true" />
+                Sign in
+              </Button>
+            ) : (
+              <Button type="button" variant="outline" onClick={() => clearToken(null)}>
+                <LogOut aria-hidden="true" />
+                Sign out
+              </Button>
+            )}
+          </form>
+          {authError !== null && (
+            <Alert variant="destructive">
+              <CircleAlert aria-hidden="true" />
+              <AlertTitle>{authError}</AlertTitle>
+            </Alert>
+          )}
+        </CardContent>
+      </Card>
 
       {token !== null && (
         <section aria-label="Stages" className="flex flex-col gap-3">
           {error !== null && (
-            <p
-              role="alert"
-              className="truncate rounded-md border border-line bg-surface-raised px-3 py-2 text-sm"
-            >
-              Stage list unavailable ({error}). Retrying every {POLL_MS / 1000} seconds.
-            </p>
+            <Alert variant="destructive">
+              <CircleAlert aria-hidden="true" />
+              <AlertTitle>Stage list unavailable</AlertTitle>
+              <AlertDescription>
+                {error}. Retrying every {POLL_MS / 1000} seconds.
+              </AlertDescription>
+            </Alert>
           )}
           {actionError !== null && (
-            <p
-              role="alert"
-              className="truncate rounded-md border border-line bg-surface-raised px-3 py-2 text-sm"
-            >
-              Request failed: {actionError}
-            </p>
+            <Alert variant="destructive">
+              <CircleAlert aria-hidden="true" />
+              <AlertTitle>Request failed</AlertTitle>
+              <AlertDescription>{actionError}</AlertDescription>
+            </Alert>
           )}
 
-          {stages === null && error === null && <p className="text-ink-muted">Loading stages…</p>}
+          {stages === null && error === null && (
+            <div role="status" className="flex flex-col gap-2">
+              <span className="sr-only">Loading stages…</span>
+              {[0, 1, 2].map((row) => (
+                <Skeleton key={row} className="h-12 w-full rounded-lg" />
+              ))}
+            </div>
+          )}
 
           {stages !== null && stages.length === 0 && (
-            <p className="text-ink-muted">No stages configured.</p>
+            <p className="text-muted-foreground">No stages configured.</p>
           )}
 
           {stages !== null && stages.length > 0 && totals !== null && (
-            <div className="md:overflow-x-auto md:rounded-lg md:border md:border-line">
-              <table role="table" className="w-full border-collapse text-sm">
-                <thead
-                  role="rowgroup"
-                  className="hidden bg-surface-raised text-left text-xs uppercase tracking-wide text-ink-muted md:table-header-group"
-                >
-                  <tr role="row">
+            <div className="md:overflow-hidden md:rounded-xl md:ring-1 md:ring-foreground/10">
+              <Table role="table">
+                <TableCaption className="sr-only">
+                  Every stage with its live metrics, refreshed every {POLL_MS / 1000} seconds.
+                </TableCaption>
+                <TableHeader role="rowgroup" className="hidden bg-muted/50 md:table-header-group">
+                  <TableRow role="row">
                     {HEADERS.map((header) => (
-                      <th
+                      <TableHead
                         key={header}
                         role="columnheader"
                         scope="col"
-                        className="whitespace-nowrap px-3 py-2 font-semibold"
+                        className="px-3 text-xs uppercase tracking-wide text-muted-foreground"
                       >
                         {header}
-                      </th>
+                      </TableHead>
                     ))}
-                  </tr>
-                </thead>
-                <tbody role="rowgroup">
+                  </TableRow>
+                </TableHeader>
+                <TableBody role="rowgroup">
                   {stages.map((stage) => {
                     const busy = pending[stage.id] === true;
                     const exporting = pending[`${stage.id}:export`] === true;
@@ -424,26 +485,28 @@ export function Admin() {
                     const lang = exportLang[stage.id] ?? defaultExportLang(stage);
                     const selectId = `export-lang-${stage.id}`;
                     return (
-                      <tr
-                        key={stage.id}
-                        role="row"
-                        data-stage={stage.id}
-                        className="mb-4 block rounded-lg border border-line bg-surface-raised p-3 md:mb-0 md:table-row md:rounded-none md:border-0 md:border-t md:border-line md:bg-transparent md:p-0"
-                      >
-                        <Cell label="Stage">
+                      <TableRow key={stage.id} role="row" data-stage={stage.id} className={ROW}>
+                        <Cell label="Stage" header>
                           <strong className="font-semibold">{stage.name}</strong>
-                          <span className="ml-2 font-mono text-xs text-ink-muted">{stage.id}</span>
+                          <span className="ml-2 font-mono text-xs text-muted-foreground">
+                            {stage.id}
+                          </span>
                           {stage.dry_run && (
-                            <span className="ml-2 rounded-sm border border-line px-1.5 py-0.5 text-xs font-semibold">
+                            <Badge variant="outline" className="ml-2">
                               Dry run
-                            </span>
+                            </Badge>
                           )}
                         </Cell>
                         <Cell label="State">
-                          <StateBadge state={stage.state} />
+                          <Badge
+                            data-state={stage.state}
+                            className={cn('font-semibold', STATE_BADGE[stage.state])}
+                          >
+                            {stage.state}
+                          </Badge>
                           {stage.detail && (
                             <span
-                              className="mt-1 block max-w-[14rem] truncate text-xs text-ink-muted"
+                              className="mt-1 block max-w-[14rem] truncate text-xs text-muted-foreground"
                               title={stage.detail}
                             >
                               {stage.detail}
@@ -461,7 +524,7 @@ export function Admin() {
                           <span className="whitespace-nowrap">
                             {formatMs(stage.p50_ms)} / {formatMs(stage.p95_ms)}
                           </span>
-                          <span className="block text-xs text-ink-muted">
+                          <span className="block text-xs text-muted-foreground">
                             interim p95 {formatMs(stage.interim_p95_ms)}
                           </span>
                         </Cell>
@@ -484,24 +547,25 @@ export function Admin() {
                         </Cell>
                         <Cell label="Actions">
                           <span className="inline-flex flex-wrap gap-2">
-                            <button
-                              type="button"
-                              className={BUTTON_PRIMARY}
+                            <Button
+                              size="sm"
                               disabled={busy || stage.running}
                               aria-label={`Start ${stage.name}`}
                               onClick={() => control(stage, 'start')}
                             >
+                              <Play aria-hidden="true" />
                               Start
-                            </button>
-                            <button
-                              type="button"
-                              className={BUTTON_PLAIN}
+                            </Button>
+                            <Button
+                              size="sm"
+                              variant="outline"
                               disabled={busy || !stage.running}
                               aria-label={`Stop ${stage.name}`}
                               onClick={() => control(stage, 'stop')}
                             >
+                              <Square aria-hidden="true" />
                               Stop
-                            </button>
+                            </Button>
                           </span>
                         </Cell>
                         <Cell label="Export">
@@ -518,7 +582,7 @@ export function Admin() {
                                   [stage.id]: event.target.value,
                                 }))
                               }
-                              className="rounded-md border border-line bg-surface px-2 py-1 text-sm text-ink"
+                              className={SELECT}
                             >
                               {(stage.languages.length > 0 ? stage.languages : [lang]).map(
                                 (code) => (
@@ -529,63 +593,72 @@ export function Admin() {
                               )}
                             </select>
                             {EXPORT_FORMATS.map((format) => (
-                              <button
+                              <Button
                                 key={format}
-                                type="button"
-                                className={BUTTON_PLAIN}
+                                size="sm"
+                                variant="outline"
                                 disabled={exporting}
                                 aria-label={`${format.toUpperCase()} export for ${stage.name}`}
                                 onClick={() => download(stage, format)}
                               >
                                 {format.toUpperCase()}
-                              </button>
+                              </Button>
                             ))}
                           </span>
-                          <span className="mt-1 flex flex-wrap gap-3 text-xs">
-                            <Link
-                              to={`/live/${encodeURIComponent(stage.id)}`}
-                              aria-label={`Live captions for ${stage.name}`}
-                              className="text-accent underline"
+                          <span className="mt-1 flex flex-wrap gap-3">
+                            <Button
+                              asChild
+                              variant="link"
+                              size="sm"
+                              className="h-auto px-0 text-xs underline"
                             >
-                              Live captions
-                            </Link>
-                            <Link
-                              to={overlayPath(stage)}
-                              aria-label={`Overlay for ${stage.name}`}
-                              className="text-accent underline"
+                              <Link
+                                to={`/live/${encodeURIComponent(stage.id)}`}
+                                aria-label={`Live captions for ${stage.name}`}
+                              >
+                                Live captions
+                              </Link>
+                            </Button>
+                            <Button
+                              asChild
+                              variant="link"
+                              size="sm"
+                              className="h-auto px-0 text-xs underline"
                             >
-                              Overlay
-                            </Link>
+                              <Link
+                                to={overlayPath(stage)}
+                                aria-label={`Overlay for ${stage.name}`}
+                              >
+                                Overlay
+                              </Link>
+                            </Button>
                           </span>
                         </Cell>
-                      </tr>
+                      </TableRow>
                     );
                   })}
-                </tbody>
-                <tfoot role="rowgroup">
-                  <tr
-                    role="row"
-                    className="block rounded-lg border border-line bg-surface-raised p-3 font-semibold md:table-row md:rounded-none md:border-0 md:border-t-2 md:border-line md:p-0"
-                  >
-                    <th
+                </TableBody>
+                <TableFooter role="rowgroup" className="border-t-0 bg-transparent md:border-t">
+                  <TableRow role="row" className={cn(ROW, 'mb-0 font-semibold md:bg-muted/50')}>
+                    <TableHead
                       role="rowheader"
                       scope="row"
-                      className="block py-1 text-left md:table-cell md:px-3 md:py-2"
+                      className={cn(CELL, 'h-auto font-semibold')}
                     >
                       Totals
-                    </th>
+                    </TableHead>
                     <Cell label="Stages">
                       {totals.live} LIVE / {totals.total}
                     </Cell>
                     <Cell label="Listeners">{formatInt(totals.listeners)}</Cell>
-                    <td role="cell" className="hidden md:table-cell" colSpan={5} />
+                    <TableCell role="cell" className="hidden md:table-cell" colSpan={5} />
                     <Cell label="Cost (USD)">
                       <span className="font-mono">{formatCost(totals.cost)}</span>
                     </Cell>
-                    <td role="cell" className="hidden md:table-cell" colSpan={2} />
-                  </tr>
-                </tfoot>
-              </table>
+                    <TableCell role="cell" className="hidden md:table-cell" colSpan={2} />
+                  </TableRow>
+                </TableFooter>
+              </Table>
             </div>
           )}
         </section>

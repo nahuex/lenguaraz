@@ -55,6 +55,60 @@ The audience view ships with a neutral dark theme, a light theme and a high-cont
 the visitor's browser. Event branding (name, colors, logo) is runtime configuration
 (`branding.yaml`, feature 008); logos are never committed to the repository.
 
+## Theming
+
+The pages are built on [shadcn/ui](https://ui.shadcn.com) (MIT) primitives over Tailwind
+CSS 4. Every colour, radius and font is a CSS variable in `web/src/index.css`; the components
+never carry a hardcoded colour, so a conference re-themes the pages by editing tokens, not
+components.
+
+**Where the themes live.** `index.css` declares the shadcn variables (`--background`,
+`--foreground`, `--card`, `--primary`, `--primary-foreground`, `--secondary`, `--muted`,
+`--accent`, `--destructive`, `--border`, `--input`, `--ring`, `--radius`, …) in three blocks,
+switched by data attributes that `web/src/lib/prefs.ts` sets on `<html>` from the viewer's
+saved preferences:
+
+| Block | Selector | When |
+|---|---|---|
+| Dark (default) | `:root` | No attribute, or `data-theme="dark"` |
+| Light | `:root[data-theme="light"]` | The viewer turns "Dark theme" off |
+| High contrast | `:root[data-contrast="high"]` | The viewer turns "High contrast" on; wins over the theme |
+
+The `dark:` utility variant follows the same attributes, and high contrast always renders on
+black. Two Lenguaraz tokens sit next to the shadcn set: `--caption-size` (the caption font
+size, switched by `data-font-size="S|M|L|XL"`, exposed as the `text-caption` utility) and
+`--focus` (the outline of the base `:focus-visible` rule). Keep the pairs at WCAG 2.1 AA
+(≥ 4.5:1) in the dark and light blocks and AAA (≥ 7:1) in the high-contrast block; the
+Overlay page keeps its own transparent CSS (`web/src/pages/overlay.css`) because it renders
+inside OBS.
+
+**Branding → `--primary`.** At runtime `web/src/lib/useBranding.ts` reads `primary_color`
+from `GET /api/branding` (`branding.yaml`) and sets `--primary` and `--ring` on `<html>`,
+plus a black or white `--primary-foreground` chosen by WCAG relative luminance, so buttons,
+the live badge, the selected font size and the brand stripe in the header take the event's
+colour without a rebuild. When high contrast is on, the overrides are removed and the AAA
+yellow-on-black pair from `index.css` stays in force: accessibility beats branding.
+
+**Adding a primitive.** Components live in `web/src/components/ui/` and are copied, not
+installed, so they can be edited like any other file:
+
+```bash
+cd web && npx shadcn@latest add <name>   # e.g. dialog, tooltip, select
+```
+
+The CLI writes the file with double quotes and no header. Before committing, add the two
+header lines every file under `ui/` carries, then run Prettier:
+
+```tsx
+// SPDX-License-Identifier: Apache-2.0
+// Derived from shadcn/ui (https://ui.shadcn.com) — MIT License, Copyright (c) 2023 shadcn
+```
+
+`make spdx-check` fails without the first line; the second keeps the MIT attribution that
+`NOTICE` promises. If the component pulls a new package, check its license against the
+allowlist and run `make license-check` (see `CONTRIBUTING.md`). Pages import primitives from
+`@/components/ui/<name>` and compose them; nobody hand-rolls a button or an input.
+
 ## OBS / vMix overlay
 
 Add a **Browser Source** pointing at `http://<host>:8000/overlay/<stage>?lang=es&lines=2`

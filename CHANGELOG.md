@@ -82,6 +82,13 @@ task ids refer to the specs under `specs/`; the full history is `git log`.
   `GET /api/branding` and shown in the page header; no brand asset is committed.
 - **Credential redaction (008):** `user:pass@` in a stage `source` URL never reaches the
   public stage detail when ffmpeg fails.
+- **Design system on shadcn/ui (MIT) (012):** tokens for dark/light/high-contrast in
+  `web/src/index.css`, switched by the existing `data-theme` / `data-contrast` attributes;
+  the `branding.yaml` colour maps to `--primary`; Radix-based accessible primitives copied
+  into `web/src/components/ui/` (Button, Card, Badge, RadioGroup, ToggleGroup, Switch, Table,
+  Input, Label, Alert, Skeleton, Separator) with `lucide-react` icons; Home, Live captions,
+  Admin and Not found rebuilt on them (the Overlay keeps its transparent CSS); axe checks
+  (`vitest-axe`) on the shared components and the Admin sign-in form.
 - **Free-tier profile and billing playbooks (008):** `examples/env/free-tier.env` for
   rehearsals and recording on a project without a billing account (final-only translation,
   no always-on language, no auto-glossary, one context segment; 15 text requests per minute);
