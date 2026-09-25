@@ -303,3 +303,43 @@ async def test_one_slow_sentence_does_not_freeze_the_following_ones(bus: MemoryB
     assert fanout.untranslated() == 1  # dropped, the on-screen order never breaks
     assert await drain(es, 0.2) == []
     await fanout.stop()
+
+
+async def test_final_reuses_the_progressive_translation_of_the_same_text(bus: MemoryBus) -> None:
+    translator = FakeTranslator()
+    fanout = TranslationFanout(
+        STAGE,
+        translator,
+        bus,
+        settings(progressive_min_words=2, progressive_debounce_ms=100),
+        sleep=fast_sleep,
+    )
+    es = bus.subscribe("main", lang="es")
+    fanout.on_caption(caption(1, "Hola a todos ustedes", final=False))
+    await asyncio.sleep(0.2)
+    fanout.on_caption(caption(1, "Hola a todos ustedes."))
+    events = await drain(es, 0.3)
+    assert [(e.is_final, e.text) for e in events] == [
+        (False, "[es] Hola a todos ustedes"),
+        (True, "[es] Hola a todos ustedes"),
+    ]
+    assert len(translator.requests) == 1  # the final cost no request
+    await fanout.stop()
+
+
+async def test_late_partial_translation_never_overwrites_a_final(bus: MemoryBus) -> None:
+    translator = SlowThenFastTranslator([0.5, 0.02])
+    fanout = TranslationFanout(
+        STAGE,
+        translator,
+        bus,
+        settings(progressive_min_words=2, progressive_debounce_ms=100, translate_hedges=0),
+        sleep=fast_sleep,
+    )
+    es = bus.subscribe("main", lang="es")
+    fanout.on_caption(caption(1, "Una frase que tarda", final=False))
+    await asyncio.sleep(0.05)
+    fanout.on_caption(caption(1, "Una frase que tarda en llegar."))
+    events = await drain(es, 0.9)
+    assert [(e.is_final, e.text) for e in events] == [(True, "[es] Una frase que tarda en llegar.")]
+    await fanout.stop()

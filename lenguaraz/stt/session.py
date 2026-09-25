@@ -19,6 +19,7 @@ from __future__ import annotations
 
 import asyncio
 import contextlib
+import difflib
 import math
 import random
 import re
@@ -64,6 +65,7 @@ class SessionStats:
     duplicates_dropped: int = 0
     stalls: int = 0
     promoted_finals: int = 0
+    segmented_finals: int = 0
     last_rotation_gap_ms: int | None = None
     last_detail: str | None = None
     states: list[StageState] = field(default_factory=list)
@@ -71,6 +73,82 @@ class SessionStats:
 
 def normalize_text(text: str) -> str:
     return " ".join(re.sub(r"[^\w\s]", " ", text.lower()).split())
+
+
+_WORD = re.compile(r"\w+")
+# a sentence end followed by more speech: ". Hoy", "día.¿Le", "? Y"
+SENTENCE_END = re.compile(
+    r"[.?!\u2026]+(?=\s+\S|[\u00bf\u00a1\"\u201c]|[A-Z\u00c1\u00c9\u00cd\u00d3\u00da\u00d1\u00dc])"
+)
+CLAUSE_END = re.compile(r"[,;:]")
+MAX_SEGMENT_WORDS = 28
+HARD_CUT_WORDS = 20
+TAIL_WORDS = 12
+
+
+def committed_offset(text: str, committed: str) -> int | None:
+    """Character offset in ``text`` right after the words of ``committed``.
+
+    Live partials can be cumulative (everything said since the session began) and the server
+    revises earlier words (punctuation, casing, "back pressure" -> "backpressure"), so the
+    comparison is word-level, case- and punctuation-insensitive, and tolerant: the last words
+    of ``committed`` are aligned inside a window around their expected position. ``None``
+    means ``text`` does not continue ``committed`` (the server started a fresh buffer).
+    """
+    cw = [w.lower() for w in _WORD.findall(committed)]
+    if not cw:
+        return 0
+    spans = list(_WORD.finditer(text))
+    tw = [m.group(0).lower() for m in spans]
+    if not tw:
+        return None
+    if len(cw) < 4:  # too short for a fuzzy match: require an exact word prefix
+        if tw[: len(cw)] != cw:
+            return None
+        return spans[len(cw) - 1].end() if len(tw) >= len(cw) else len(text)
+    tail = cw[-TAIL_WORDS:]
+    lo = max(0, len(cw) - len(tail) - 10)
+    hi = min(len(tw), len(cw) + 10)
+    window = tw[lo:hi]
+    if not window:
+        return None
+    blocks = [
+        b
+        for b in difflib.SequenceMatcher(None, tail, window, autojunk=False).get_matching_blocks()
+        if b.size
+    ]
+    if not blocks or sum(b.size for b in blocks) < 0.6 * len(tail):
+        return None
+    last = blocks[-1]
+    matched_end = spans[lo + last.b + last.size - 1].end()
+    extra = len(tail) - (last.a + last.size)  # committed words after the last match
+    end = min(max(lo + last.b + last.size - 1 + extra, 0), len(tw) - 1)
+    offset = spans[end].end()
+    if extra and committed.rstrip()[-1:] in ".?!\u2026":
+        # merged/split words ("back pressure" -> "backpressure") shift the count: the
+        # committed text ended a sentence, so cut at the first sentence end after the match
+        stop = re.search(r"[.?!\u2026]", text[matched_end:])
+        if stop and len(_WORD.findall(text[matched_end : matched_end + stop.end()])) <= extra + 3:
+            offset = matched_end + stop.end()
+    return offset
+
+
+def segment_cut(shown: str) -> int | None:
+    """Where to close a sentence inside an uncommitted partial: after the last sentence end
+    followed by more speech, or (long run-on partials) at a clause boundary / hard word cap."""
+    cut = None
+    for match in SENTENCE_END.finditer(shown):
+        cut = match.end()
+    if cut is not None:
+        return cut
+    spans = list(_WORD.finditer(shown))
+    if len(spans) < MAX_SEGMENT_WORDS:
+        return None
+    best = None
+    for match in CLAUSE_END.finditer(shown):
+        if len(_WORD.findall(shown[: match.end()])) >= 8:
+            best = match.end()
+    return best if best is not None else spans[HARD_CUT_WORDS - 1].end()
 
 
 def chunk_rms(chunk: bytes) -> float:
@@ -290,6 +368,8 @@ class ManagedSttSession:
         self.session_id = getattr(session, "session_id", None)
         self._receiver_task = asyncio.create_task(self._receiver(session), name="stt-receiver")
         self._last_caption_wall = self._clock()
+        self._committed_cumulative = ""
+        self._last_interim_text = ""
         self._active_ready.set()
         self._failures = 0
         self._set_state(StageState.LIVE, None)
@@ -337,13 +417,38 @@ class ManagedSttSession:
         candidates = [t for t in (self._stall_seconds / 4, self._final_timeout / 2) if t > 0]
         return min(candidates) if candidates else None
 
-    def _strip_committed(self, text: str) -> str:
-        """Some server modes send cumulative text (everything since the session began).
-        Return only what comes after the last committed cumulative text."""
+    def _split_committed(self, text: str) -> tuple[int, str]:
+        """``(start, uncommitted)``: the part of a (possibly cumulative) server text that has
+        not been committed yet; ``start`` is its offset in ``text``."""
         committed = self._committed_cumulative
-        if committed and len(text) > len(committed) and text.startswith(committed):
-            return text[len(committed) :].lstrip(" .,;:!?").strip()
-        return text
+        if not committed:
+            return 0, text.strip()
+        offset = committed_offset(text, committed)
+        if offset is None:
+            # the server started a fresh buffer (new utterance or session): nothing to strip
+            self._committed_cumulative = ""
+            return 0, text.strip()
+        rest = text[offset:].lstrip(" .,;:!?\u2026")
+        return len(text) - len(rest), rest.strip()
+
+    def _commit_sentences(
+        self, raw: str, start: int, shown: str, language: str | None, session: SttSession
+    ) -> str:
+        """Close complete sentences inside a partial right away (do not wait for the server's
+        final, which today can take a paragraph); return what stays as the partial."""
+        cut = segment_cut(shown)
+        if cut is None:
+            return shown
+        done, rest = shown[:cut].strip(), shown[cut:].strip()
+        if done:
+            segment = self._segment(SttEvent.final(done, language), session, is_final=True)
+            if segment is not None:
+                self.stats.finals += 1
+                self.stats.segmented_finals += 1
+                self._emit(segment)
+                self._seq += 1
+        self._committed_cumulative = raw[: start + cut]
+        return rest
 
     def _promote_pending_final(self) -> None:
         """The server sometimes never commits a sentence after ``audio_stream_end``; after
@@ -355,13 +460,10 @@ class ManagedSttSession:
         if self._clock() - since < self._final_timeout:
             return
         self._await_final_since = None
-        cumulative = self._await_final_text.strip()
-        latest = self._last_interim_text.strip()
-        if latest.startswith(cumulative) and len(latest) > len(cumulative):
-            # the speaker kept going after the pause: commit everything heard so far so the
-            # final is not frozen at the pause (seen 2026-09-25: truncated promoted finals)
-            cumulative = latest
-        text = self._strip_committed(cumulative)
+        # the speaker may have kept going after the pause: commit everything heard so far so
+        # the final is not frozen at the pause (seen 2026-09-25: truncated promoted finals)
+        cumulative = self._last_interim_text.strip() or self._await_final_text.strip()
+        _, text = self._split_committed(cumulative)
         if not text:
             return
         event = SttEvent.final(text, self._await_final_language)
@@ -556,9 +658,13 @@ class ManagedSttSession:
             kind = event.kind
             if kind is SttEventKind.INTERIM:
                 raw_interim = event.text.strip()
-                shown = self._strip_committed(raw_interim)
+                start, shown = self._split_committed(raw_interim)
                 if shown:
                     self._last_interim_text = raw_interim
+                    shown = self._commit_sentences(
+                        raw_interim, start, shown, event.language_code, session
+                    )
+                if shown:
                     event = SttEvent.interim(shown, event.language_code)
                     segment = self._segment(event, session, is_final=False)
                     if segment is not None:
@@ -567,9 +673,16 @@ class ManagedSttSession:
             elif kind is SttEventKind.FINAL:
                 self._await_final_since = None
                 raw_final = event.text.strip()
-                event = SttEvent.final(self._strip_committed(raw_final), event.language_code)
-                if raw_final and event.text.strip():
-                    self._committed_cumulative = raw_final if raw_final != event.text else ""
+                start, final_text = self._split_committed(raw_final)
+                event = SttEvent.final(final_text, event.language_code)
+                if raw_final and final_text:
+                    previous = self._committed_cumulative
+                    # a cumulative final replaces the committed text; a standalone one is
+                    # appended (if the server keeps accumulating, the next partial starts
+                    # with both; if it resets, the mismatch clears it)
+                    self._committed_cumulative = (
+                        raw_final if start > 0 or not previous else f"{previous} {raw_final}"
+                    )
                     segment = self._segment(event, session, is_final=True)
                     if segment is not None:
                         self.stats.finals += 1

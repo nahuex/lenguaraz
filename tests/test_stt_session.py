@@ -423,7 +423,7 @@ async def test_cumulative_interims_promote_only_the_new_sentence() -> None:
     assert finals == ["Good morning everyone.", "Today we talk about eBPF."]
     interims = [s.text for s in recorder.segments if not s.is_final]
     assert "Today we talk" in interims and "Good morning everyone.Today we talk" not in interims
-    assert manager.stats.promoted_finals == 2
+    assert manager.stats.promoted_finals + manager.stats.segmented_finals == 2
     await queue.put(None)
     await asyncio.wait_for(task, 2)
 
@@ -458,3 +458,71 @@ async def test_promotion_commits_words_heard_after_the_pause() -> None:
     assert finals == ["Hoy vamos a construir un servicio"]
     await queue.put(None)
     await asyncio.wait_for(task, 2)
+
+
+async def test_sentences_are_closed_at_punctuation_without_duplicates() -> None:
+    """Cumulative partials with revisions (a comma is inserted into committed text): each
+    sentence becomes a final as soon as the next one starts, and nothing is repeated."""
+    session = ScriptedSttSession(
+        [
+            (0.02, SttEvent.interim("Buenas tardes a todos y gracias")),
+            (0.02, SttEvent.interim("Buenas tardes a todos y gracias por venir. Hoy vamos")),
+            (
+                0.02,
+                SttEvent.interim(
+                    "Buenas tardes a todos, y gracias por venir. Hoy vamos a construir."
+                ),
+            ),
+            (
+                0.02,
+                SttEvent.interim(
+                    "Buenas tardes a todos, y gracias por venir. "
+                    "Hoy vamos a construir. \u00bfListos"
+                ),
+            ),
+        ],
+        hold_open=True,
+    )
+    recorder = Recorder()
+    queue: asyncio.Queue[bytes | None] = asyncio.Queue()
+    manager = managed(ScriptedSttEngine([session]), recorder, stall_seconds=0, final_timeout=0)
+    task = asyncio.create_task(manager.run(queue))
+    await wait_until(lambda: sum(s.is_final for s in recorder.segments) == 2, timeout=2.0)
+    finals = [s.text for s in recorder.segments if s.is_final]
+    assert finals == ["Buenas tardes a todos y gracias por venir.", "Hoy vamos a construir."]
+    later = [
+        s.text
+        for s in recorder.segments[
+            recorder.segments.index(next(s for s in recorder.segments if s.is_final)) + 1 :
+        ]
+    ]
+    assert not any("Buenas" in text for text in later)  # never repeated
+    assert manager.stats.segmented_finals == 2
+    await queue.put(None)
+    await asyncio.wait_for(task, 2)
+
+
+def test_long_run_on_partial_is_cut_at_a_clause_or_word_cap() -> None:
+    from lenguaraz.stt.session import segment_cut
+
+    words = " ".join(f"palabra{i}" for i in range(30))
+    cut = segment_cut(words)
+    assert cut is not None and len(words[:cut].split()) == 20
+    with_comma = "uno dos tres cuatro cinco seis siete ocho nueve, " + words
+    cut = segment_cut(with_comma)
+    assert with_comma[:cut].endswith("nueve,")
+    assert segment_cut("una frase corta sin punto") is None
+    assert segment_cut("Node.js y v1.2 no cortan") is None
+
+
+def test_committed_offset_tolerates_revisions() -> None:
+    from lenguaraz.stt.session import committed_offset
+
+    committed = "Cada escenario tiene su propio task group y su propia cola con back pressure."
+    text = (
+        "Cada escenario tiene su propio TaskGroup y su propia cola con backpressure. "
+        "Para transcribir"
+    )
+    offset = committed_offset(text, committed)
+    assert offset is not None and text[offset:].strip(" .") == "Para transcribir"
+    assert committed_offset("Otra cosa distinta", committed) is None

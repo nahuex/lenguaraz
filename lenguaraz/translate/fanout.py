@@ -43,6 +43,12 @@ COOLDOWN_MIN_SECONDS = 5.0
 COOLDOWN_MAX_SECONDS = 120.0
 RETRY_HINT = re.compile(r"retry in ([0-9.]+)s", re.IGNORECASE)
 StatusCallback = Callable[[str], None]
+
+
+def _norm(text: str) -> str:
+    return " ".join(re.sub(r"[^\w\s]", " ", text.lower()).split())
+
+
 SleepFn = Callable[[float], Awaitable[None]]
 
 
@@ -51,6 +57,9 @@ class _Progressive:
     last_text: str = ""
     last_time: float = -1e9
     task: asyncio.Task[None] | None = None
+    seq: int = -1
+    source_norm: str = ""
+    translation: str = ""
 
 
 @dataclass(slots=True)
@@ -67,6 +76,7 @@ class _Language:
     rate_limited: int = 0
     untranslated: int = 0
     hedged: int = 0
+    reused: int = 0
     last_final_seq: int = -1
 
 
@@ -198,7 +208,18 @@ class TranslationFanout:
     ) -> None:
         try:
             started = self._clock()
-            text = await self._translate(code, lang, event, is_final=True)
+            state = lang.progressive
+            if (
+                state.translation
+                and state.seq == event.seq
+                and state.source_norm == _norm(event.text)
+            ):
+                # the final repeats the last partial we already translated: reuse it (0 s)
+                text: str | None = state.translation
+                lang.reused += 1
+                lang.context.append((event.text, state.translation))
+            else:
+                text = await self._translate(code, lang, event, is_final=True)
             if previous is not None:
                 # keep publication order, but never let one slow sentence freeze the view
                 wait = self._settings.translate_order_wait_ms / 1000.0
@@ -247,8 +268,14 @@ class TranslationFanout:
     ) -> None:
         started = self._clock()
         text = await self._translate(code, lang, event, is_final=is_final)
-        if text is not None:
-            self._publish(code, event, text, is_final=is_final, started=started)
+        if text is None:
+            return
+        if not is_final:
+            if event.seq <= lang.last_final_seq:
+                return  # the sentence is already final: a late partial must not overwrite it
+            state = lang.progressive
+            state.seq, state.source_norm, state.translation = event.seq, _norm(event.text), text
+        self._publish(code, event, text, is_final=is_final, started=started)
 
     async def _translate(
         self, code: str, lang: _Language, event: CaptionEvent, *, is_final: bool

@@ -325,6 +325,7 @@ class StageRunner:
             "duplicates_dropped": stats.duplicates_dropped if stats else 0,
             "stalls": stats.stalls if stats else 0,
             "promoted_finals": stats.promoted_finals if stats else 0,
+            "segmented_finals": stats.segmented_finals if stats else 0,
             "last_rotation_gap_ms": stats.last_rotation_gap_ms if stats else None,
             "chunks_dropped": self.chunks_dropped,
             "captions_final": self.metrics.captions_final,
