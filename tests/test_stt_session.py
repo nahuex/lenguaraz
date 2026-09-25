@@ -552,3 +552,19 @@ async def test_a_promoted_final_is_split_into_sentences() -> None:
     assert finals == ["La idea es seguir con ADK.", "Si vinieron ayer, bienvenidos"]
     await queue.put(None)
     await asyncio.wait_for(task, 2)
+
+
+async def test_a_multi_sentence_server_final_becomes_one_line_per_sentence() -> None:
+    session = ScriptedSttSession(
+        [(0.02, SttEvent.final("La idea es seguir con ADK.Si vinieron ayer, bienvenidos."))],
+        hold_open=True,
+    )
+    recorder = Recorder()
+    queue: asyncio.Queue[bytes | None] = asyncio.Queue()
+    manager = managed(ScriptedSttEngine([session]), recorder, stall_seconds=0, final_timeout=0)
+    task = asyncio.create_task(manager.run(queue))
+    await wait_until(lambda: sum(s.is_final for s in recorder.segments) == 2, timeout=2.0)
+    finals = [(s.seq, s.text) for s in recorder.segments if s.is_final]
+    assert finals == [(0, "La idea es seguir con ADK."), (1, "Si vinieron ayer, bienvenidos.")]
+    await queue.put(None)
+    await asyncio.wait_for(task, 2)

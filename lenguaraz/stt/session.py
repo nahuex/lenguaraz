@@ -466,16 +466,37 @@ class ManagedSttSession:
         _, text = self._split_committed(cumulative)
         if not text:
             return
-        event = SttEvent.final(text, self._await_final_language)
-        segment = self._segment(event, self._active, is_final=True)
-        if segment is None:
+        emitted = self._emit_final_sentences(
+            text, self._await_final_language, self._active, promoted=True
+        )
+        if not emitted:
             return
-        self.stats.finals += 1
-        self.stats.promoted_finals += 1
-        self._emit(segment)
-        self._seq += 1
         self._last_interim_text = ""
         self._committed_cumulative = cumulative
+
+    def _emit_final_sentences(
+        self, text: str, language: str | None, session: SttSession, *, promoted: bool = False
+    ) -> int:
+        """Publish ``text`` as finals, one caption line per sentence ("…ADK.Si vinieron…"
+        becomes two lines). Returns how many finals were emitted."""
+        parts: list[str] = []
+        rest = text
+        while (match := SENTENCE_END.search(rest)) is not None:
+            parts.append(rest[: match.end()].strip())
+            rest = rest[match.end() :].strip()
+        parts.append(rest)
+        emitted = 0
+        for part in (p for p in parts if p):
+            segment = self._segment(SttEvent.final(part, language), session, is_final=True)
+            if segment is None:
+                continue
+            self.stats.finals += 1
+            if promoted:
+                self.stats.promoted_finals += 1
+            self._emit(segment)
+            self._seq += 1
+            emitted += 1
+        return emitted
 
     def _stalled(self) -> bool:
         """True when speech was heard after the last caption and the window has expired."""
@@ -674,7 +695,6 @@ class ManagedSttSession:
                 self._await_final_since = None
                 raw_final = event.text.strip()
                 start, final_text = self._split_committed(raw_final)
-                event = SttEvent.final(final_text, event.language_code)
                 if raw_final and final_text:
                     previous = self._committed_cumulative
                     # a cumulative final replaces the committed text; a standalone one is
@@ -683,11 +703,7 @@ class ManagedSttSession:
                     self._committed_cumulative = (
                         raw_final if start > 0 or not previous else f"{previous} {raw_final}"
                     )
-                    segment = self._segment(event, session, is_final=True)
-                    if segment is not None:
-                        self.stats.finals += 1
-                        self._emit(segment)
-                        self._seq += 1
+                    self._emit_final_sentences(final_text, event.language_code, session)
             elif kind is SttEventKind.GO_AWAY:
                 if session is self._active:
                     left = (
