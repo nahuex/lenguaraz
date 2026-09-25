@@ -27,6 +27,7 @@ from lenguaraz.models import CaptionEvent
 from lenguaraz.translate.base import (
     TranslationEngine,
     TranslationError,
+    TranslationOutcome,
     TranslationRequest,
     TranslationUsage,
 )
@@ -65,6 +66,7 @@ class _Language:
     cooldown_until: float = 0.0
     rate_limited: int = 0
     untranslated: int = 0
+    hedged: int = 0
 
 
 class TranslationFanout:
@@ -104,6 +106,10 @@ class TranslationFanout:
 
     def usage(self) -> dict[str, dict[str, int]]:
         return {code: lang.usage.as_dict() for code, lang in self._languages.items()}
+
+    def hedged(self) -> int:
+        """Extra (hedged) translation requests sent because the first one was slow."""
+        return sum(lang.hedged for lang in self._languages.values())
 
     def untranslated(self) -> int:
         """Finals that were left out of a language because translation failed or was paused."""
@@ -254,9 +260,7 @@ class TranslationFanout:
         last_error: Exception | None = None
         for attempt, delay in enumerate((*BACKOFF_SECONDS, None), start=1):
             try:
-                outcome = await asyncio.wait_for(
-                    self._engine.translate(request), self._settings.translate_timeout_seconds
-                )
+                outcome = await self._hedged_translate(request, lang)
             except TranslationError as exc:
                 if exc.code == 429:
                     self._rate_limited(code, lang, exc)
@@ -289,6 +293,58 @@ class TranslationFanout:
             self._on_status(detail)
         self._skip(code, lang, is_final, str(last_error))
         return None
+
+    async def _hedged_translate(
+        self, request: TranslationRequest, lang: _Language
+    ) -> TranslationOutcome:
+        """Hedged requests (tail-latency best practice): if the first call has not answered after
+        ``translate_hedge_after_ms``, send an identical one; the first success wins and the rest
+        are cancelled. Measured 2026-09-25: parallel calls to the same model returned in 38.3 s,
+        1.6 s and 1.7 s, so slowness is per request and hedging removes most of the tail."""
+        loop = asyncio.get_running_loop()
+        deadline = loop.time() + self._settings.translate_timeout_seconds
+        hedge_after = self._settings.translate_hedge_after_ms / 1000.0
+        max_attempts = 1 + (self._settings.translate_hedges if hedge_after > 0 else 0)
+        pending: set[asyncio.Task[TranslationOutcome]] = set()
+        last_error: BaseException | None = None
+        attempts = 0
+
+        def launch() -> None:
+            nonlocal attempts
+            attempts += 1
+            pending.add(asyncio.create_task(self._engine.translate(request)))
+
+        launch()
+        try:
+            while True:
+                remaining = deadline - loop.time()
+                if remaining <= 0:
+                    raise TimeoutError
+                can_hedge = attempts < max_attempts
+                wait = min(remaining, hedge_after) if can_hedge else remaining
+                done: set[asyncio.Task[TranslationOutcome]] = set()
+                if pending:
+                    done, _ = await asyncio.wait(
+                        pending, timeout=wait, return_when=asyncio.FIRST_COMPLETED
+                    )
+                for task in done:
+                    pending.discard(task)
+                    error = task.exception()
+                    if error is None:
+                        return task.result()
+                    last_error = error
+                    if isinstance(error, TranslationError) and error.code == 429:
+                        raise error  # rate limited: more copies would make it worse
+                if not pending:
+                    # every copy failed: let the caller's retry-with-backoff handle the error
+                    raise last_error if last_error is not None else TimeoutError()
+                if can_hedge and not done:
+                    # hedge only on slowness, never on errors
+                    launch()
+                    lang.hedged += 1
+        finally:
+            for task in pending:
+                task.cancel()
 
     def _skip(self, code: str, lang: _Language, is_final: bool, reason: str) -> None:
         """Each language view shows only its own language (owner decision, 2026-09-25): a

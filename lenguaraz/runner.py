@@ -335,6 +335,7 @@ class StageRunner:
             "translation_tokens": translation_usage,
             "translation_rate_limited": self.fanout.rate_limited() if self.fanout else 0,
             "translation_untranslated": self.fanout.untranslated() if self.fanout else 0,
+            "translation_hedged": self.fanout.hedged() if self.fanout else 0,
             "running": self.running,
             "audio_seconds": round(audio_seconds, 1),
             "est_cost_usd": round(

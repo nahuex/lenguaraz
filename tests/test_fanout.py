@@ -236,3 +236,50 @@ async def test_finals_translate_concurrently_and_publish_in_order(bus: MemoryBus
     assert [e.seq for e in events] == [1, 2, 3, 4]
     assert [e.text for e in events] == [f"[es] Sentence {seq}." for seq in range(1, 5)]
     await fanout.stop()
+
+
+class SlowThenFastTranslator(FakeTranslator):
+    """First call is slow (a queued request), later calls are fast."""
+
+    def __init__(self, delays: list[float]) -> None:
+        super().__init__()
+        self._delays = list(delays)
+
+    async def translate(self, request, on_delta=None):  # type: ignore[no-untyped-def,override]
+        delay = self._delays.pop(0) if self._delays else 0.0
+        self.requests.append(request)
+        await asyncio.sleep(delay)
+        return await FakeTranslator().translate(request, on_delta)
+
+
+async def test_hedged_request_wins_when_the_first_call_is_slow(bus: MemoryBus) -> None:
+    translator = SlowThenFastTranslator([3.0, 0.05])
+    fanout = TranslationFanout(
+        STAGE,
+        translator,
+        bus,
+        settings(translate_hedge_after_ms=100, translate_hedges=2, translate_timeout_seconds=5),
+        sleep=fast_sleep,
+    )
+    es = bus.subscribe("main", lang="es")
+    loop = asyncio.get_running_loop()
+    started = loop.time()
+    fanout.on_caption(caption(1, "Hedge me."))
+    events = await drain(es, 0.6)
+    assert [e.text for e in events] == ["[es] Hedge me."]
+    assert loop.time() - started < 0.7  # without hedging it would take 3 s
+    assert len(translator.requests) == 2 and fanout.hedged() == 1
+    await fanout.stop()
+
+
+async def test_no_hedge_when_the_first_call_is_fast(bus: MemoryBus) -> None:
+    translator = SlowThenFastTranslator([0.02])
+    fanout = TranslationFanout(
+        STAGE, translator, bus, settings(translate_hedge_after_ms=300), sleep=fast_sleep
+    )
+    es = bus.subscribe("main", lang="es")
+    fanout.on_caption(caption(1, "Quick."))
+    events = await drain(es, 0.5)
+    assert [e.text for e in events] == ["[es] Quick."]
+    assert len(translator.requests) == 1 and fanout.hedged() == 0
+    await fanout.stop()
