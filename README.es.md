@@ -114,7 +114,10 @@ los subtítulos son eventos WebSocket simples. El costo crece con los escenarios
 escenarios × idiomas: un stream de transcripción por escenario alimenta todos los idiomas
 como texto. El reporte de `make simulate` (`docs/scale-report.md`: diez escenarios, dos
 reales y ocho simulados, ≈10 % de un core y +18 MB de RSS) y la tabla de dimensionamiento
-en `docs/deploy/scaling.md` le ponen números medidos a esto.
+en `docs/deploy/scaling.md` le ponen números medidos a esto; `make loadtest` agrega el lado
+de la audiencia: 1.000 espectadores WebSocket concurrentes en un escenario, cada subtítulo
+llega al último espectador 58 ms (p95) después del primero, con menos de un quinto de un core
+(`docs/loadtest-report.md`, motor falso, mismo host).
 
 ## Glosario técnico y nombres propios
 
@@ -146,7 +149,7 @@ Escrita para un líder técnico voluntario de una conferencia que nunca conocimo
 | [Producción (VM + Compose + TLS)](docs/deploy/production.md) | [Resolución de problemas](docs/troubleshooting.md) | [Referencia de configuración](docs/configuration.md) |
 | [Cloud Run](docs/deploy/cloud-run.md) | [Personalización: idiomas, glosario, branding, overlay](docs/customization.md) | [Costo por escenario-hora](docs/cost.md) · [Métricas](docs/metrics.md) · [Reporte de escala](docs/scale-report.md) |
 | [Escalar a 30+ escenarios](docs/deploy/scaling.md) | [Seguridad](docs/security.md) · [Privacidad](docs/privacy.md) · [SECURITY.md](SECURITY.md) | [Decisiones](docs/decisions.md) · [Changelog](CHANGELOG.md) |
-| [Fuentes de audio: SRT, RTMP, HLS, OBS, archivos](docs/deploy/audio-sources.md) | [Ejemplos: escenarios, branding, perfiles .env](examples/) | [Contribuir](CONTRIBUTING.md) · [Código de conducta](CODE_OF_CONDUCT.md) |
+| [Fuentes de audio: SRT, RTMP, HLS, OBS, archivos](docs/deploy/audio-sources.md) | [Ejemplos: escenarios, branding, perfiles .env (dry-run, producción, tier gratuito)](examples/) | [Contribuir](CONTRIBUTING.md) · [Código de conducta](CODE_OF_CONDUCT.md) |
 
 `make docs-check` verifica que este conjunto exista, que cada configuración esté documentada
 y que cada link resuelva; `make fresh-clone-test` clona el repo público en un directorio

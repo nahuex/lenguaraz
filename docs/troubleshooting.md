@@ -20,7 +20,8 @@ Symptom → cause → fix. Every stage state and detail is visible on the home p
 | A listener picks a language and sees nothing for ~10 s | The language had no listener and is not in `ALWAYS_ON_LANGS`; it becomes active with the next final caption | Expected on the first join; add the language to `ALWAYS_ON_LANGS` if it must always be ready |
 | Translation is right but slow (several seconds) | `GEMINI_TRANSLATE_THINKING` set above `minimal`, or long segments | Use `minimal`; keep `PROGRESSIVE_TRANSLATION=true` so a provisional line appears while the sentence is spoken |
 | WebSocket closes with `4429` | Too many caption sockets from one IP (`WS_MAX_CONN_PER_IP`) — typical behind a venue NAT | Raise `WS_MAX_CONN_PER_IP` |
-| Captions show an `original` marker / stage detail says `rate limited (429)` | The Gemini project is on the **free tier** for the text model (`generate_content_free_tier_requests`, 15 requests/min): translations pause for the time the server asks and the original text is shown meanwhile → link a Cloud Billing account to the AI Studio project (Tier 1); until then set `PROGRESSIVE_TRANSLATION=false` and keep one target language. |
+| Captions show an `original` marker / stage detail says `rate limited (429)` | The Gemini project is on the **free tier** for the text model (`generate_content_free_tier_requests`, 15 requests/min): translations pause for the time the server asks and the original text is shown meanwhile | Link a Cloud Billing account to the AI Studio project (Tier 1) **and buy prepay credits** (next row). To stay on the free tier, start from `examples/env/free-tier.env` (final-only translation, no always-on language, no auto-glossary) and watch one stage and one language at a time |
+| Every stage `DEGRADED` or `STOPPED` at once with detail `402 RESOURCE_EXHAUSTED: Your prepayment credits are depleted`; translated captions show the original text; `make smoke-stt` fails the same way | The project is Tier 1 on a Cloud Billing account with the **prepay** plan and a **USD 0** balance: every call, Live transcription and text alike, is refused until credits are bought. Linking billing alone is not enough | Buy prepay credits (minimum USD 5) at https://aistudio.google.com/billing → **Buy credits**; once a prepay balance exists, eligible Google Cloud credits are consumed first. Calls resume within a minute or two: press `Start` on stopped stages. Alternative: unlink the project from the billing account → back to the free tier with `examples/env/free-tier.env`. Details in the section below |
 | WebSocket closes with `4413` | The client could not keep up; the server never drops final captions, so it closed the socket | The client reconnects automatically; check the network of that device |
 | `/api/admin/*` answers `401` | Missing or wrong `Authorization: Bearer <ADMIN_TOKEN>` header | Copy the token from `.env`; the Admin page keeps it in session storage only |
 | Export answers `404` with `available: [...]` | That stage produced no final caption in the requested language yet (language not active or no listener) | Pick a listed language, or add it to `ALWAYS_ON_LANGS` so it is always produced |
@@ -36,3 +37,28 @@ logs `stall`, closes the session and opens a new one; the stage snapshot in the 
 it under `stalls`. If you see stalls every few minutes, check the audio level first (a stream
 that is too quiet never triggers speech and never captions), then raise `STT_STALL_SECONDS`
 for very slow speakers or set it to `0` to disable the watchdog.
+
+## 402: prepayment credits are depleted
+
+**Symptom:** every stage goes `DEGRADED` or `STOPPED` at the same moment with detail
+`402 RESOURCE_EXHAUSTED: Your prepayment credits are depleted. Please go to AI Studio at
+https://ai.studio/projects`; translated captions show the original text; `make smoke-stt`
+fails with the same message. Nothing is wrong with the key or the network.
+
+**Cause:** the AI Studio project is linked to a Cloud Billing account on the **prepay** plan
+(the default for new accounts) and the prepay balance is **USD 0**. Linking the account moves
+the project to Tier 1, but on the prepay plan every request is refused until credits are
+bought — even when the billing account holds Google Cloud promotional credits, because those
+are consumed only once an active prepay balance exists.
+
+**Fix:** open https://aistudio.google.com/billing, check that the right billing account is
+selected, press **Buy credits** and buy the minimum (USD 5). Calls succeed again within a
+minute or two; press `Start` on the stopped stages (or restart the container) and confirm with
+`make smoke-stt` → `RESULT: PASS`. With a prepay balance in place, eligible Cloud credits are
+consumed first, so the USD 5 stay almost untouched.
+
+**Alternative:** unlink the project from the billing account (Cloud console → Billing →
+Account management) and it returns to the free tier: 15 text requests per minute and a
+handful of concurrent Live sessions. Run it from `examples/env/free-tier.env` and watch one
+stage and one language at a time. Not for a real event: the free tier may use content to
+improve Google products (`docs/privacy.md`).

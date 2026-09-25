@@ -52,6 +52,7 @@ REQUIRED_DOCS = (
     "examples/branding.example.yaml",
     "examples/env/dry-run.env",
     "examples/env/production.env",
+    "examples/env/free-tier.env",
 )
 README_SECTIONS = (
     "## Quickstart",

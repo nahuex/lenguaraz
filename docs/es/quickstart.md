@@ -27,6 +27,9 @@ audio (`samples/*.txt`) al ritmo de habla; ejercita todo el pipeline salvo la ll
    **facturación habilitada** (el tier gratuito limita las sesiones Live concurrentes y las
    solicitudes diarias, y puede usar el contenido para mejorar productos de Google; ver
    `docs/privacy.md`). Los operadores deben ser mayores de 18 años.
+   Las cuentas de facturación nuevas de AI Studio son **prepagas**: comprá al menos USD 5 de
+   créditos (AI Studio → Facturación → **Comprar créditos**) o cada llamada responde
+   `402 prepayment credits are depleted`, aunque la facturación esté vinculada.
 2. Ponela en `.env`: `GEMINI_API_KEY=…` y `ENGINE=gemini`.
 3. `docker compose up --build` de nuevo. La etiqueta desaparece y los subtítulos ahora vienen
    de `gemini-3.5-transcribe-live` escuchando el audio de muestra.
@@ -75,7 +78,8 @@ WAV mono de 16 kHz.
 |---|---|
 | El escenario muestra `STOPPED` con `cannot open WAV` / `ffmpeg exited` | La ruta o URL del `source` está mal, o falta ffmpeg → corregí la ruta, instalá ffmpeg o definí `FFMPEG_BIN`. |
 | El escenario muestra `DEGRADED` con `quota exhausted (429…)` | Límites del tier gratuito o tope de gasto → habilitá facturación en el proyecto, o reducí escenarios concurrentes. |
-| Los subtítulos muestran la marca `original` / el detalle dice `rate limited (429)` | El proyecto de Gemini está en el **tier gratuito** para el modelo de texto (`generate_content_free_tier_requests`, 15 solicitudes/min): la traducción se pausa el tiempo que pide el servidor y mientras tanto se muestra el texto original → vinculá una cuenta de facturación de Cloud al proyecto de AI Studio (Tier 1); hasta entonces poné `PROGRESSIVE_TRANSLATION=false` y dejá un solo idioma destino. |
+| Los subtítulos muestran la marca `original` / el detalle dice `rate limited (429)` | El proyecto de Gemini está en el **tier gratuito** para el modelo de texto (`generate_content_free_tier_requests`, 15 solicitudes/min): la traducción se pausa el tiempo que pide el servidor y mientras tanto se muestra el texto original → vinculá una cuenta de facturación de Cloud al proyecto de AI Studio (Tier 1) y comprá créditos prepagos; para seguir en el tier gratuito, arrancá desde `examples/env/free-tier.env` y mirá un solo escenario y un solo idioma a la vez. |
+| Todos los escenarios en `STOPPED`/`DEGRADED` con `402 … prepayment credits are depleted` | La cuenta de facturación es prepaga con saldo USD 0 → comprá créditos (mínimo USD 5) en https://aistudio.google.com/billing; con saldo prepago, los créditos de Cloud se consumen primero. Alternativa: desvinculá el proyecto → tier gratuito. |
 | El escenario muestra `STOPPED` con `authentication failed` | `GEMINI_API_KEY` incorrecta → pegá la key de AI Studio en `.env`. |
 | `ROTATING` por un instante cada ~9 minutos | Normal: la sesión Live dura 10 minutos; Lenguaraz abre la siguiente antes y cambia en una pausa (no se pierde ninguna frase). |
 | Los subtítulos se detienen mientras el orador habla | El watchdog reabre la sesión después de `STT_STALL_SECONDS`; si se repite, revisá el nivel de audio (`docs/troubleshooting.md`). |

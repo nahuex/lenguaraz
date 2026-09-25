@@ -8,7 +8,7 @@ UV ?= uv
 NPM ?= npm
 COMPOSE ?= docker compose
 
-.PHONY: help verify dev up down logs demo web smoke-stt smoke-translate simulate samples mvp-check \
+.PHONY: help verify dev up down logs demo web smoke-stt smoke-translate simulate loadtest samples mvp-check \
         license-check spdx-check docs-check fresh-clone-test hooks
 
 help: ## List targets
@@ -48,6 +48,9 @@ smoke-translate: ## Real Gemini call: translate sample segments EN->ES and ES->E
 
 simulate: ## Run N stages in one process (SIM_ARGS="--stages 10 --seconds 60 --real 2") and write docs/scale-report.md
 	$(UV) run lenguaraz simulate $(SIM_ARGS)
+
+loadtest: ## Viewer fan-out load test (fake engine, no quota); LOAD_ARGS="--viewers 100,500" writes docs/loadtest-report.md
+	$(UV) run lenguaraz loadtest $(LOAD_ARGS)
 
 samples: ## Generate EN/ES test audio + sentence boundaries with Gemini TTS into samples/ (uses quota)
 	$(UV) run lenguaraz samples $(SAMPLES_ARGS)

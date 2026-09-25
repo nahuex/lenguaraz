@@ -54,6 +54,16 @@ editing files.
 | `FFMPEG_BIN` | path | `ffmpeg` | ffmpeg executable used for non-WAV files and every stream. Local 16 kHz mono WAV files never need ffmpeg. |
 | `WEB_DIST` | path | *(auto)* | Folder with the built audience view. Defaults to `web/dist` next to the package (`/app/web/dist` in the container). |
 
+### `.env` profiles
+
+Ready-made starting points under `examples/env/`; copy one to `.env` and fill the secrets:
+
+| Profile | Use it for | What it sets |
+|---|---|---|
+| `examples/env/dry-run.env` | Trying the UI with no credentials | `ENGINE=fake` and a placeholder `ADMIN_TOKEN` |
+| `examples/env/production.env` | A real event, on a project with billing linked **and a positive prepay balance** | `ENGINE=gemini`, model ids, hybrid VAD, progressive translation, `ALWAYS_ON_LANGS` for the overlay, a higher `WS_MAX_CONN_PER_IP` |
+| `examples/env/free-tier.env` | Rehearsals, demos and recording on a project **without** a billing account (15 text requests per minute) | `ENGINE=gemini`, `PROGRESSIVE_TRANSLATION=false`, `ALWAYS_ON_LANGS` empty, `AUTO_GLOSSARY=false`, `TRANSLATE_CONTEXT_SEGMENTS=1`; watch one stage and one language at a time |
+
 ## `stages.yaml`
 
 ```yaml

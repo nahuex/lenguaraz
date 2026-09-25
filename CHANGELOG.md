@@ -43,7 +43,10 @@ task ids refer to the specs under `specs/`; the full history is `git log`.
 - **Scale proof (005):** `make simulate` runs N stages in one process (real and simulated
   mix), samples CPU and RSS and writes `docs/scale-report.md` with an honesty note; measured
   cost per stage-hour, worked example and quota planning in `docs/cost.md` and
-  `docs/deploy/scaling.md`.
+  `docs/deploy/scaling.md`; `make loadtest` opens 100/500/1000 WebSocket viewers against a
+  fake-engine server subprocess and measures the fan-out spread (first to last viewer
+  receiving the same caption), server CPU/RSS and client CPU (`docs/loadtest-report.md`,
+  `## Viewer fan-out` in the scale report).
 - **Auto-glossary (006):** technical terms and proper names derived from the talk title and
   abstract with Gemini structured output (a heuristic in dry run), merged after the manual
   list (manual wins, 100 terms max); `smoke-stt --glossary none|manual|auto` with measured
@@ -65,6 +68,13 @@ task ids refer to the specs under `specs/`; the full history is `git log`.
   `GET /api/branding` and shown in the page header; no brand asset is committed.
 - **Credential redaction (008):** `user:pass@` in a stage `source` URL never reaches the
   public stage detail when ffmpeg fails.
+- **Free-tier profile and billing playbooks (008):** `examples/env/free-tier.env` for
+  rehearsals and recording on a project without a billing account (final-only translation,
+  no always-on language, no auto-glossary, one context segment; 15 text requests per minute);
+  troubleshooting and runbook playbooks for `402 prepayment credits are depleted` (Tier 1
+  project on a prepay billing account with USD 0) and for the free-tier `429`; the T-24h
+  checklist verifies billing with `make smoke-stt`; the quickstarts warn that new AI Studio
+  billing accounts are prepay; recording-day checklist in `docs/video-script.md`.
 
 ### Changed
 - Standard English names for every user-facing surface (Live captions `/live/{stage}`,

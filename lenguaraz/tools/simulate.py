@@ -288,8 +288,16 @@ async def simulate(
 
 
 def write_report(report: Report, out_md: Path = REPORT_MD, out_json: Path = REPORT_JSON) -> None:
+    """Write the report; a ``## Viewer fan-out`` section left by ``make loadtest`` survives."""
+    from lenguaraz.tools.loadtest import FANOUT_HEADING, extract_section, upsert_section
+
     out_md.parent.mkdir(parents=True, exist_ok=True)
-    out_md.write_text(render_markdown(report), encoding="utf-8")
+    markdown = render_markdown(report)
+    if out_md.is_file():
+        fanout = extract_section(out_md.read_text(encoding="utf-8"), FANOUT_HEADING)
+        if fanout:
+            markdown = upsert_section(markdown, FANOUT_HEADING, fanout)
+    out_md.write_text(markdown, encoding="utf-8")
     out_json.write_text(json.dumps(asdict(report), indent=2) + "\n", encoding="utf-8")
 
 

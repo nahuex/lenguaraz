@@ -68,6 +68,11 @@ make mvp-check MVP_ARGS="--engine gemini"        # the seven MVP gates on the re
 make simulate SIM_ARGS="--stages 10 --seconds 60 --real 2"   # scale report (docs/scale-report.md)
 ```
 
+The viewer fan-out load test needs no key: `make loadtest LOAD_ARGS="--viewers 100,500,1000
+--seconds 30"` starts a fake-engine server as a subprocess, opens that many WebSocket viewers
+per step and writes `docs/loadtest-report.md` (spread between the first and the last viewer
+receiving the same caption, server CPU/RSS).
+
 Record measured numbers in `docs/metrics.md` with the date and method; the README states
 only what was measured.
 

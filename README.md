@@ -106,7 +106,10 @@ or hostname per instance: stages never share state, and captions are plain WebSo
 Cost grows with stages, not with stages × languages: one transcription stream per stage feeds
 every language as text. The scale report from `make simulate` (`docs/scale-report.md`: ten
 stages, two real and eight simulated, ≈10 % of one core and +18 MB RSS) and the sizing table
-in `docs/deploy/scaling.md` put measured numbers on this.
+in `docs/deploy/scaling.md` put measured numbers on this; `make loadtest` adds the audience
+side: 1,000 concurrent WebSocket viewers on one stage, every caption reaching the last viewer
+58 ms (p95) after the first, at under a fifth of a core (`docs/loadtest-report.md`, fake
+engine, same host).
 
 ## Technical glossary & proper names
 
@@ -138,7 +141,7 @@ Written for a volunteer tech lead at a conference we have never met (see the
 | [Production (VM + Compose + TLS)](docs/deploy/production.md) | [Troubleshooting](docs/troubleshooting.md) | [Configuration reference](docs/configuration.md) |
 | [Cloud Run](docs/deploy/cloud-run.md) | [Customization: languages, glossary, branding, overlay](docs/customization.md) | [Cost per stage-hour](docs/cost.md) · [Metrics](docs/metrics.md) · [Scale report](docs/scale-report.md) |
 | [Scaling to 30+ stages](docs/deploy/scaling.md) | [Security](docs/security.md) · [Privacy](docs/privacy.md) · [SECURITY.md](SECURITY.md) | [Decisions log](docs/decisions.md) · [Changelog](CHANGELOG.md) |
-| [Audio sources: SRT, RTMP, HLS, OBS, files](docs/deploy/audio-sources.md) | [Examples: stages, branding, .env profiles](examples/) | [Contributing](CONTRIBUTING.md) · [Code of conduct](CODE_OF_CONDUCT.md) |
+| [Audio sources: SRT, RTMP, HLS, OBS, files](docs/deploy/audio-sources.md) | [Examples: stages, branding, .env profiles (dry-run, production, free-tier)](examples/) | [Contributing](CONTRIBUTING.md) · [Code of conduct](CODE_OF_CONDUCT.md) |
 
 `make docs-check` verifies that this set exists, that every setting is documented and that
 every link resolves; `make fresh-clone-test` clones the public repo into an empty directory and
