@@ -46,6 +46,7 @@ REQUIRED_DOCS = (
     "docs/metrics.md",
     "docs/operations/runbook.md",
     "docs/devpost.md",
+    "docs/design/brief.md",
     "docs/video-script.md",
     "examples/stages.minimal.yaml",
     "examples/stages.multitrack.yaml",
