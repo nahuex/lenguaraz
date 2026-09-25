@@ -157,6 +157,8 @@ class StageRunner:
             on_state=self._on_session_state,
             rotate_seconds=float(self._settings.session_rotate_seconds),
             stall_seconds=float(self._settings.stt_stall_seconds),
+            final_timeout=float(self._settings.stt_final_timeout_seconds),
+            max_reconnects=self._settings.stt_max_reconnects,
             vad_silence_ms=(
                 self._settings.vad_silence_ms if self._settings.vad_mode is VadMode.HYBRID else None
             ),
@@ -322,6 +324,7 @@ class StageRunner:
             "errors": stats.errors if stats else 0,
             "duplicates_dropped": stats.duplicates_dropped if stats else 0,
             "stalls": stats.stalls if stats else 0,
+            "promoted_finals": stats.promoted_finals if stats else 0,
             "last_rotation_gap_ms": stats.last_rotation_gap_ms if stats else None,
             "chunks_dropped": self.chunks_dropped,
             "captions_final": self.metrics.captions_final,

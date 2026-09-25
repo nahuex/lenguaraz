@@ -184,6 +184,7 @@ async def run(
         on_state=on_state,
         rotate_seconds=float(rotate or settings.session_rotate_seconds),
         stall_seconds=float(settings.stt_stall_seconds),
+        final_timeout=float(settings.stt_final_timeout_seconds),
         vad_silence_ms=settings.vad_silence_ms if settings.vad_mode is VadMode.HYBRID else None,
         vad_threshold=settings.vad_threshold,
         drain_seconds=settings.rotation_drain_seconds,
@@ -226,6 +227,7 @@ async def run(
     print(f"glossary: {glossary_label}")
     print(f"finals: {len(finals)}  interims: {len(interims)}  sessions: {stats.sessions_opened}")
     print(f"errors: {stats.errors}  rotations: {stats.rotations}  vad_signals: {stats.vad_signals}")
+    print(f"promoted finals (server sent no final within the timeout): {stats.promoted_finals}")
     if rotate:
         expected = len(boundaries) if boundaries else None
         lost = (expected - len(finals)) if expected is not None else "n/a"

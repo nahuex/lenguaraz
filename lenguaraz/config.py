@@ -240,6 +240,8 @@ class Settings(BaseSettings):
     vad_threshold: int = Field(default=300, ge=1, le=20000)
     session_rotate_seconds: int = Field(default=540, ge=30, le=600)
     stt_stall_seconds: int = Field(default=20, ge=0, le=300)
+    stt_final_timeout_seconds: float = Field(default=3.0, ge=0, le=30)
+    stt_max_reconnects: int = Field(default=60, ge=1, le=100000)
     rotation_drain_seconds: float = Field(default=3.0, ge=0, le=30)
     dedupe_window_seconds: float = Field(default=5.0, ge=0, le=60)
     rotation_swap_max_wait_seconds: float = Field(default=8.0, ge=0, le=60)

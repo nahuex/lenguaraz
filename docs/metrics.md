@@ -33,6 +33,9 @@ Measured by the project's own tooling (Constitution Art. V.2); definitions below
 | 2026-09-24 21:55 | es_asyncio.wav | SMART · glossary=auto (+2) | 7 | 4.3% | 1151/1151 | 715/746 | 0/422 | 0/0 | 0.0072 |
 | 2026-09-24 21:56 | es_asyncio.wav | SMART · glossary=none | 7 | 7.6% | 1042/1562 | 848/936 | 407/516 | 0/0 | 0.0072 |
 | 2026-09-24 21:59 | en_kubernetes.wav | SMART · glossary=none | 7 | 3.2% | 1025/1782 | 923/1069 | 219/453 | 0/0 | 0.0059 |
+| 2026-09-25 12:11 | en_kubernetes.wav | SMART · glossary=manual (9) | 4 | 86.3% | 2881/8172 | 4623/9013 | 359/4906 | 0/0 | 0.0063 |
+| 2026-09-25 12:14 | en_kubernetes.wav | SMART · glossary=manual (9) | 0 | 100.0% | n/a | n/a | n/a | 0/0 | 0.0000 |
+| 2026-09-25 12:15 | en_kubernetes.wav | SMART · glossary=manual (9) | 0 | 100.0% | n/a | n/a | n/a | 0/0 | 0.0000 |
 
 ### Notes
 

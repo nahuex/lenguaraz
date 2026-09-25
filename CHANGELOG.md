@@ -7,6 +7,9 @@ task ids refer to the specs under `specs/`; the full history is `git log`.
 
 ## [Unreleased]
 
+### Fixed
+- Live API days without finals: after `STT_FINAL_TIMEOUT_SECONDS` (3 s) without a server final following a detected pause, the last partial is promoted to a final; cumulative partials (everything since the session began) are trimmed to the new sentence for both finals and the audience interim. Stages now tolerate `STT_MAX_RECONNECTS` (60) failed connects instead of 5.
+
 ### Added
 - **HTTPS / TLS (013):** `TLS_CERT_FILE` / `TLS_KEY_FILE` (optional `TLS_CA_FILE`) make
   `lenguaraz serve` terminate TLS itself: `https://` and `wss://` on `PORT`, `"tls": true` in

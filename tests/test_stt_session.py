@@ -324,3 +324,105 @@ async def test_no_stall_without_speech_or_when_disabled() -> None:
         await queue.put(None)
         await asyncio.wait_for(task, 2)
         assert manager.stats.stalls == 0 and manager.stats.sessions_opened == 1
+
+
+async def test_final_is_promoted_from_the_last_interim_when_the_server_never_commits() -> None:
+    """A pause was signalled, the server sent interims but no final: after final_timeout the
+    last interim becomes the final; a late identical final is de-duplicated."""
+    session = ScriptedSttSession(
+        [(0.02, SttEvent.interim("Hello")), (0.02, SttEvent.interim("Hello world."))],
+        hold_open=True,
+    )
+    recorder = Recorder()
+    queue: asyncio.Queue[bytes | None] = asyncio.Queue()
+    manager = managed(
+        ScriptedSttEngine([session]),
+        recorder,
+        vad_silence_ms=40,
+        final_timeout=0.2,
+        stall_seconds=0,
+    )
+    task = asyncio.create_task(manager.run(queue))
+    await asyncio.sleep(0.1)  # interims arrive
+    for _ in range(3):
+        await queue.put(LOUD)
+    for _ in range(3):
+        await queue.put(CHUNK)  # 3 x 100 ms of silence -> audio_stream_end
+    await wait_until(lambda: any(s.is_final for s in recorder.segments), timeout=2.0)
+    finals = [s for s in recorder.segments if s.is_final]
+    assert [f.text for f in finals] == ["Hello world."]
+    assert manager.stats.promoted_finals == 1 and manager.stats.finals == 1
+    await queue.put(None)
+    await asyncio.wait_for(task, 2)
+
+
+async def test_no_promotion_when_the_real_final_arrives_in_time() -> None:
+    session = ScriptedSttSession(
+        [(0.02, SttEvent.interim("Hi there")), (0.15, SttEvent.final("Hi there."))],
+        hold_open=True,
+    )
+    recorder = Recorder()
+    queue: asyncio.Queue[bytes | None] = asyncio.Queue()
+    manager = managed(
+        ScriptedSttEngine([session]),
+        recorder,
+        vad_silence_ms=40,
+        final_timeout=0.5,
+        stall_seconds=0,
+    )
+    task = asyncio.create_task(manager.run(queue))
+    await asyncio.sleep(0.05)
+    for _ in range(3):
+        await queue.put(LOUD)
+    for _ in range(3):
+        await queue.put(CHUNK)
+    await wait_until(lambda: any(s.is_final for s in recorder.segments), timeout=2.0)
+    await asyncio.sleep(0.6)
+    finals = [s for s in recorder.segments if s.is_final]
+    assert [f.text for f in finals] == ["Hi there."]
+    assert manager.stats.promoted_finals == 0
+    await queue.put(None)
+    await asyncio.wait_for(task, 2)
+
+
+async def test_cumulative_interims_promote_only_the_new_sentence() -> None:
+    """Server mode seen on 2026-09-25: partials accumulate the whole transcript and no final
+    ever comes. Each promotion must emit only the new sentence, and the audience interim must
+    show only the current sentence."""
+    session = ScriptedSttSession(
+        [
+            (0.02, SttEvent.interim("Good morning everyone.")),
+            (0.30, SttEvent.interim("Good morning everyone.Today we talk")),
+            (0.02, SttEvent.interim("Good morning everyone.Today we talk about eBPF.")),
+        ],
+        hold_open=True,
+    )
+    recorder = Recorder()
+    queue: asyncio.Queue[bytes | None] = asyncio.Queue()
+    manager = managed(
+        ScriptedSttEngine([session]),
+        recorder,
+        vad_silence_ms=40,
+        final_timeout=0.15,
+        stall_seconds=0,
+    )
+    task = asyncio.create_task(manager.run(queue))
+    await asyncio.sleep(0.08)
+    for _ in range(2):
+        await queue.put(LOUD)
+    for _ in range(3):
+        await queue.put(CHUNK)  # pause 1
+    await wait_until(lambda: sum(s.is_final for s in recorder.segments) == 1, timeout=2.0)
+    await asyncio.sleep(0.35)  # second sentence's interims arrive
+    for _ in range(2):
+        await queue.put(LOUD)
+    for _ in range(3):
+        await queue.put(CHUNK)  # pause 2
+    await wait_until(lambda: sum(s.is_final for s in recorder.segments) == 2, timeout=2.0)
+    finals = [s.text for s in recorder.segments if s.is_final]
+    assert finals == ["Good morning everyone.", "Today we talk about eBPF."]
+    interims = [s.text for s in recorder.segments if not s.is_final]
+    assert "Today we talk" in interims and "Good morning everyone.Today we talk" not in interims
+    assert manager.stats.promoted_finals == 2
+    await queue.put(None)
+    await asyncio.wait_for(task, 2)
