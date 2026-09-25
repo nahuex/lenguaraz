@@ -56,6 +56,8 @@ class _Progressive:
 class _Language:
     queue: asyncio.Queue[CaptionEvent]
     worker: asyncio.Task[None] | None = None
+    inflight: set[asyncio.Task[None]] = field(default_factory=set)
+    turn: asyncio.Future[None] | None = None
     context: deque[tuple[str, str]] = field(default_factory=lambda: deque(maxlen=3))
     usage: TranslationUsage = field(default_factory=TranslationUsage)
     progressive: _Progressive = field(default_factory=_Progressive)
@@ -133,6 +135,7 @@ class TranslationFanout:
                 tasks.append(lang.worker)
             if lang.progressive.task is not None:
                 tasks.append(lang.progressive.task)
+            tasks.extend(lang.inflight)
         for task in tasks:
             task.cancel()
         for task in tasks:
@@ -161,9 +164,42 @@ class TranslationFanout:
         lang.queue.put_nowait(event)
 
     async def _worker(self, code: str, lang: _Language) -> None:
+        """Translate up to ``translate_concurrency`` finals at once, publish them in order."""
+        limit = max(1, self._settings.translate_concurrency)
+        gate = asyncio.Semaphore(limit)
         while True:
             event = await lang.queue.get()
-            await self._translate_and_publish(code, lang, event, is_final=True)
+            await gate.acquire()
+            previous = lang.turn
+            mine: asyncio.Future[None] = asyncio.get_running_loop().create_future()
+            lang.turn = mine
+            task = asyncio.create_task(
+                self._translate_in_turn(code, lang, event, previous, mine, gate),
+                name=f"translate-{code}-{event.seq}",
+            )
+            lang.inflight.add(task)
+            task.add_done_callback(lang.inflight.discard)
+
+    async def _translate_in_turn(
+        self,
+        code: str,
+        lang: _Language,
+        event: CaptionEvent,
+        previous: asyncio.Future[None] | None,
+        mine: asyncio.Future[None],
+        gate: asyncio.Semaphore,
+    ) -> None:
+        try:
+            started = self._clock()
+            text = await self._translate(code, lang, event, is_final=True)
+            if previous is not None:
+                await previous  # keep publication order
+            if text is not None:
+                self._publish(code, event, text, is_final=True, started=started)
+        finally:
+            if not mine.done():
+                mine.set_result(None)
+            gate.release()
 
     # -- progressive translation of partials --------------------------------------------------
 
@@ -193,6 +229,15 @@ class TranslationFanout:
     async def _translate_and_publish(
         self, code: str, lang: _Language, event: CaptionEvent, *, is_final: bool
     ) -> None:
+        started = self._clock()
+        text = await self._translate(code, lang, event, is_final=is_final)
+        if text is not None:
+            self._publish(code, event, text, is_final=is_final, started=started)
+
+    async def _translate(
+        self, code: str, lang: _Language, event: CaptionEvent, *, is_final: bool
+    ) -> str | None:
+        """Translate one caption; ``None`` means the sentence is skipped in this language."""
         request = TranslationRequest(
             text=event.text,
             source_lang=event.lang,
@@ -205,7 +250,7 @@ class TranslationFanout:
         started = self._clock()
         if started < lang.cooldown_until:
             self._skip(code, lang, is_final, "rate limited")
-            return
+            return None
         last_error: Exception | None = None
         for attempt, delay in enumerate((*BACKOFF_SECONDS, None), start=1):
             try:
@@ -216,7 +261,7 @@ class TranslationFanout:
                 if exc.code == 429:
                     self._rate_limited(code, lang, exc)
                     self._skip(code, lang, is_final, "rate limited")
-                    return
+                    return None
                 last_error = exc
                 if not exc.retryable or delay is None:
                     break
@@ -237,13 +282,13 @@ class TranslationFanout:
             lang.usage.add(outcome.usage)
             if is_final:
                 lang.context.append((event.text, outcome.text))
-            self._publish(code, event, outcome.text, is_final=is_final, started=started)
-            return
+            return outcome.text
         detail = f"translation to {code} failed: {last_error}"
         self._log.error(detail)
         if self._on_status is not None:
             self._on_status(detail)
         self._skip(code, lang, is_final, str(last_error))
+        return None
 
     def _skip(self, code: str, lang: _Language, is_final: bool, reason: str) -> None:
         """Each language view shows only its own language (owner decision, 2026-09-25): a

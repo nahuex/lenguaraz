@@ -116,7 +116,10 @@ async def test_pass_through_never_calls_the_engine_for_the_source_language(bus: 
 
 async def test_order_is_preserved_per_language(bus: MemoryBus) -> None:
     translator = FakeTranslator(delay=0.02)
-    fanout = TranslationFanout(STAGE, translator, bus, settings(), sleep=fast_sleep)
+    # concurrency 1: the context of a request is the previous *finished* translations
+    fanout = TranslationFanout(
+        STAGE, translator, bus, settings(translate_concurrency=1), sleep=fast_sleep
+    )
     es = bus.subscribe("main", lang="es")
     for seq in range(4):
         fanout.on_caption(caption(seq, f"Sentence {seq}."))
@@ -218,4 +221,18 @@ async def test_slow_translation_times_out_and_degrades_without_blocking(bus: Mem
     events = await drain(es, 1.0)
     assert events == [] and fanout.untranslated() == 1
     assert len(translator.requests) == 1  # no retries on a timeout
+    await fanout.stop()
+
+
+async def test_finals_translate_concurrently_and_publish_in_order(bus: MemoryBus) -> None:
+    translator = FakeTranslator(delay=0.4)
+    fanout = TranslationFanout(
+        STAGE, translator, bus, settings(translate_concurrency=4), sleep=fast_sleep
+    )
+    es = bus.subscribe("main", lang="es")
+    for seq in range(1, 5):
+        fanout.on_caption(caption(seq, f"Sentence {seq}."))
+    events = await drain(es, 0.9)  # sequential would need 1.6 s
+    assert [e.seq for e in events] == [1, 2, 3, 4]
+    assert [e.text for e in events] == [f"[es] Sentence {seq}." for seq in range(1, 5)]
     await fanout.stop()

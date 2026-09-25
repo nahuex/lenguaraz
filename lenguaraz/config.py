@@ -255,6 +255,7 @@ class Settings(BaseSettings):
     gemini_translate_thinking: str = Field(default="minimal", pattern="^(minimal|low|medium|high)$")
     translate_context_segments: int = Field(default=3, ge=0, le=10)
     translate_timeout_seconds: float = Field(default=10.0, ge=0.1, le=120)
+    translate_concurrency: int = Field(default=4, ge=1, le=16)
     auto_glossary: bool = True
     auto_glossary_max_terms: int = Field(default=60, ge=1, le=100)
     gemini_translate_api: str = Field(
