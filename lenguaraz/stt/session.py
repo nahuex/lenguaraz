@@ -356,6 +356,11 @@ class ManagedSttSession:
             return
         self._await_final_since = None
         cumulative = self._await_final_text.strip()
+        latest = self._last_interim_text.strip()
+        if latest.startswith(cumulative) and len(latest) > len(cumulative):
+            # the speaker kept going after the pause: commit everything heard so far so the
+            # final is not frozen at the pause (seen 2026-09-25: truncated promoted finals)
+            cumulative = latest
         text = self._strip_committed(cumulative)
         if not text:
             return

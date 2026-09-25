@@ -426,3 +426,35 @@ async def test_cumulative_interims_promote_only_the_new_sentence() -> None:
     assert manager.stats.promoted_finals == 2
     await queue.put(None)
     await asyncio.wait_for(task, 2)
+
+
+async def test_promotion_commits_words_heard_after_the_pause() -> None:
+    session = ScriptedSttSession(
+        [
+            (0.02, SttEvent.interim("Hoy vamos a construir")),
+            (0.25, SttEvent.interim("Hoy vamos a construir un servicio")),
+        ],
+        hold_open=True,
+    )
+    recorder = Recorder()
+    queue: asyncio.Queue[bytes | None] = asyncio.Queue()
+    manager = managed(
+        ScriptedSttEngine([session]),
+        recorder,
+        vad_silence_ms=40,
+        final_timeout=0.4,
+        stall_seconds=0,
+    )
+    task = asyncio.create_task(manager.run(queue))
+    await asyncio.sleep(0.08)
+    for _ in range(2):
+        await queue.put(LOUD)
+    for _ in range(3):
+        await queue.put(
+            CHUNK
+        )  # pause -> audio_stream_end with the snapshot 'Hoy vamos a construir'
+    await wait_until(lambda: any(s.is_final for s in recorder.segments), timeout=2.0)
+    finals = [s.text for s in recorder.segments if s.is_final]
+    assert finals == ["Hoy vamos a construir un servicio"]
+    await queue.put(None)
+    await asyncio.wait_for(task, 2)
