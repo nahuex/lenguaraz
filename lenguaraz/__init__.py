@@ -6,4 +6,4 @@ Gemini Live API. Components: audio ingest, transcription, translation, event bus
 glossary, transcript export, the live captions page, the overlay and the admin dashboard.
 """
 
-__version__ = "0.1.0"
+__version__ = "1.0.0"

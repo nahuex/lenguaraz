@@ -11,7 +11,7 @@ import lenguaraz
 
 
 def test_version() -> None:
-    assert lenguaraz.__version__ == "0.1.0"
+    assert lenguaraz.__version__ == "1.0.0"
 
 
 def test_network_guard_blocks_remote_hosts() -> None:

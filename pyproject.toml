@@ -1,6 +1,6 @@
 [project]
 name = "lenguaraz"
-version = "0.1.0"
+version = "1.0.0"
 description = "The open-source interpreter for every stage: real-time transcription and translation for multi-track conferences."
 readme = "README.md"
 license = "Apache-2.0"
