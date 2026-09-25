@@ -526,3 +526,29 @@ def test_committed_offset_tolerates_revisions() -> None:
     offset = committed_offset(text, committed)
     assert offset is not None and text[offset:].strip(" .") == "Para transcribir"
     assert committed_offset("Otra cosa distinta", committed) is None
+
+
+async def test_a_promoted_final_is_split_into_sentences() -> None:
+    session = ScriptedSttSession(
+        [(0.02, SttEvent.interim("La idea es seguir con ADK.Si vinieron ayer, bienvenidos"))],
+        hold_open=True,
+    )
+    recorder = Recorder()
+    queue: asyncio.Queue[bytes | None] = asyncio.Queue()
+    manager = managed(
+        ScriptedSttEngine([session]),
+        recorder,
+        vad_silence_ms=40,
+        final_timeout=0.1,
+        stall_seconds=0,
+    )
+    task = asyncio.create_task(manager.run(queue))
+    await asyncio.sleep(0.05)
+    await queue.put(LOUD)
+    for _ in range(3):
+        await queue.put(CHUNK)
+    await wait_until(lambda: sum(s.is_final for s in recorder.segments) >= 2, timeout=2.0)
+    finals = [s.text for s in recorder.segments if s.is_final]
+    assert finals == ["La idea es seguir con ADK.", "Si vinieron ayer, bienvenidos"]
+    await queue.put(None)
+    await asyncio.wait_for(task, 2)
