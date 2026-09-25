@@ -7,6 +7,12 @@ task ids refer to the specs under `specs/`; the full history is `git log`.
 
 ## [Unreleased]
 
+_Nothing yet._
+
+## [1.0.0] - 2026-09-25
+
+Submission build for the Nerdearla Vibeathon 2026 (main at the merge of PR #8: design system on shadcn/ui, HTTPS/TLS, final promotion, viewer load test).
+
 ### Fixed
 - Live API days without finals: after `STT_FINAL_TIMEOUT_SECONDS` (3 s) without a server final following a detected pause, the last partial is promoted to a final; cumulative partials (everything since the session began) are trimmed to the new sentence for both finals and the audience interim. Stages now tolerate `STT_MAX_RECONNECTS` (60) failed connects instead of 5.
 
@@ -127,6 +133,7 @@ approves the tag after reviewing the simulator report and the fresh-clone test.
 MVP milestone: features 001–002 above will move here when the owner approves the tag after
 the live two-stage demo.
 
-[Unreleased]: https://github.com/nahuex/lenguaraz/compare/v0.2.0...HEAD
+[Unreleased]: https://github.com/nahuex/lenguaraz/compare/v1.0.0...HEAD
+[1.0.0]: https://github.com/nahuex/lenguaraz/compare/v0.1.0...v1.0.0
 [0.2.0]: https://github.com/nahuex/lenguaraz/compare/v0.1.0...v0.2.0
 [0.1.0]: https://github.com/nahuex/lenguaraz/releases/tag/v0.1.0
