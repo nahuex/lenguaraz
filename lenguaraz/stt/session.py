@@ -63,6 +63,7 @@ class SessionStats:
     vad_signals: int = 0
     duplicates_dropped: int = 0
     stalls: int = 0
+    promoted_finals: int = 0
     last_rotation_gap_ms: int | None = None
     last_detail: str | None = None
     states: list[StageState] = field(default_factory=list)
@@ -99,6 +100,7 @@ class ManagedSttSession:
         dedupe_window: float = 5.0,
         swap_max_wait: float = 8.0,
         stall_seconds: float = 20.0,
+        final_timeout: float = 3.0,
         sleep: SleepFn = asyncio.sleep,
         clock: Callable[[], float] = time.monotonic,
         rng: Callable[[], float] = random.random,
@@ -117,6 +119,12 @@ class ManagedSttSession:
         self._dedupe_window = dedupe_window
         self._swap_max_wait = swap_max_wait
         self._stall_seconds = stall_seconds
+        self._final_timeout = final_timeout
+        self._last_interim_text = ""
+        self._await_final_since: float | None = None
+        self._await_final_text = ""
+        self._await_final_language: str | None = None
+        self._committed_cumulative = ""
         self._last_speech_wall: float | None = None
         self._last_caption_wall: float | None = None
         self._pending: SttSession | None = None
@@ -195,7 +203,7 @@ class ManagedSttSession:
                 waiter = asyncio.create_task(self._rotate_requested.wait(), name="stt-rotate")
                 done, _ = await asyncio.wait(
                     {sender, receiver, waiter},
-                    timeout=self._stall_seconds / 4 if self._stall_seconds > 0 else None,
+                    timeout=self._loop_timeout(),
                     return_when=asyncio.FIRST_COMPLETED,
                 )
                 if not waiter.done():
@@ -204,7 +212,9 @@ class ManagedSttSession:
                         await waiter
 
                 if not done:
-                    # periodic check: speech keeps flowing but the server sends nothing (spec 007)
+                    # periodic checks: a final that never came (promote the last interim) and a
+                    # server that sends nothing while speech keeps flowing (spec 007)
+                    self._promote_pending_final()
                     if self._stalled() and not await self._handle_stall():
                         return
                     continue
@@ -322,6 +332,43 @@ class ManagedSttSession:
         await asyncio.sleep(self._swap_max_wait)
         if self._pending is not None:
             self._swap(self._pending)
+
+    def _loop_timeout(self) -> float | None:
+        candidates = [t for t in (self._stall_seconds / 4, self._final_timeout / 2) if t > 0]
+        return min(candidates) if candidates else None
+
+    def _strip_committed(self, text: str) -> str:
+        """Some server modes send cumulative text (everything since the session began).
+        Return only what comes after the last committed cumulative text."""
+        committed = self._committed_cumulative
+        if committed and len(text) > len(committed) and text.startswith(committed):
+            return text[len(committed) :].lstrip(" .,;:!?").strip()
+        return text
+
+    def _promote_pending_final(self) -> None:
+        """The server sometimes never commits a sentence after ``audio_stream_end``; after
+        ``final_timeout`` seconds the last interim becomes the final so translation and the
+        transcript keep flowing. A late real final is dropped by the dedupe window."""
+        since = self._await_final_since
+        if since is None or self._active is None:
+            return
+        if self._clock() - since < self._final_timeout:
+            return
+        self._await_final_since = None
+        cumulative = self._await_final_text.strip()
+        text = self._strip_committed(cumulative)
+        if not text:
+            return
+        event = SttEvent.final(text, self._await_final_language)
+        segment = self._segment(event, self._active, is_final=True)
+        if segment is None:
+            return
+        self.stats.finals += 1
+        self.stats.promoted_finals += 1
+        self._emit(segment)
+        self._seq += 1
+        self._last_interim_text = ""
+        self._committed_cumulative = cumulative
 
     def _stalled(self) -> bool:
         """True when speech was heard after the last caption and the window has expired."""
@@ -489,6 +536,9 @@ class ManagedSttSession:
                 if silence_ms >= self._vad_silence_ms:
                     await session.end_of_stream()
                     self.stats.vad_signals += 1
+                    if self._final_timeout > 0 and self._last_interim_text:
+                        self._await_final_since = self._clock()
+                        self._await_final_text = self._last_interim_text
                     speech_seen = False
                     silence_ms = 0
                     if self._pending is not None:
@@ -500,13 +550,21 @@ class ManagedSttSession:
         async for event in session.events():
             kind = event.kind
             if kind is SttEventKind.INTERIM:
-                if event.text.strip():
+                raw_interim = event.text.strip()
+                shown = self._strip_committed(raw_interim)
+                if shown:
+                    self._last_interim_text = raw_interim
+                    event = SttEvent.interim(shown, event.language_code)
                     segment = self._segment(event, session, is_final=False)
                     if segment is not None:
                         self.stats.interims += 1
                         self._emit(segment)
             elif kind is SttEventKind.FINAL:
-                if event.text.strip():
+                self._await_final_since = None
+                raw_final = event.text.strip()
+                event = SttEvent.final(self._strip_committed(raw_final), event.language_code)
+                if raw_final and event.text.strip():
+                    self._committed_cumulative = raw_final if raw_final != event.text else ""
                     segment = self._segment(event, session, is_final=True)
                     if segment is not None:
                         self.stats.finals += 1
@@ -562,6 +620,7 @@ class ManagedSttSession:
             self._last_interim_wall = None
         else:
             self._last_interim_wall = now
+            self._await_final_language = event.language_code
         return segment
 
     @staticmethod
