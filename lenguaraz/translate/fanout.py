@@ -4,7 +4,7 @@
 One ordered worker per (stage, language): finals are translated sequentially per language,
 so captions never arrive out of order. Pass-through is inherent: a listener whose language
 equals the caption's source language already receives the original from the bus. Errors
-retry with backoff; a persistent failure publishes the caption with ``degraded=True`` and the
+retry with backoff; a persistent failure leaves that sentence out of that language (counted) and the
 original text, and reports a status detail, while STT captions keep flowing (FR-002-07).
 Progressive translation (FR-002-06) translates a debounced partial hypothesis and publishes
 it as an interim caption that the final later replaces (same ``seq``).
@@ -62,6 +62,7 @@ class _Language:
     dropped: int = 0
     cooldown_until: float = 0.0
     rate_limited: int = 0
+    untranslated: int = 0
 
 
 class TranslationFanout:
@@ -101,6 +102,10 @@ class TranslationFanout:
 
     def usage(self) -> dict[str, dict[str, int]]:
         return {code: lang.usage.as_dict() for code, lang in self._languages.items()}
+
+    def untranslated(self) -> int:
+        """Finals that were left out of a language because translation failed or was paused."""
+        return sum(lang.untranslated for lang in self._languages.values())
 
     def rate_limited(self) -> int:
         """How many times a 429 paused a language (all languages)."""
@@ -199,9 +204,7 @@ class TranslationFanout:
         )
         started = self._clock()
         if started < lang.cooldown_until:
-            self._publish(
-                code, event, event.text, is_final=is_final, started=started, degraded=True
-            )
+            self._skip(code, lang, is_final, "rate limited")
             return
         last_error: Exception | None = None
         for attempt, delay in enumerate((*BACKOFF_SECONDS, None), start=1):
@@ -212,9 +215,7 @@ class TranslationFanout:
             except TranslationError as exc:
                 if exc.code == 429:
                     self._rate_limited(code, lang, exc)
-                    self._publish(
-                        code, event, event.text, is_final=is_final, started=started, degraded=True
-                    )
+                    self._skip(code, lang, is_final, "rate limited")
                     return
                 last_error = exc
                 if not exc.retryable or delay is None:
@@ -242,7 +243,15 @@ class TranslationFanout:
         self._log.error(detail)
         if self._on_status is not None:
             self._on_status(detail)
-        self._publish(code, event, event.text, is_final=is_final, started=started, degraded=True)
+        self._skip(code, lang, is_final, str(last_error))
+
+    def _skip(self, code: str, lang: _Language, is_final: bool, reason: str) -> None:
+        """Each language view shows only its own language (owner decision, 2026-09-25): a
+        sentence whose translation fails is left out of that language and counted; the original
+        stays available in its own view. Nothing is published for it."""
+        if is_final:
+            lang.untranslated += 1
+        self._log.info("translation to %s skipped (%s)", code, reason)
 
     def _rate_limited(self, code: str, lang: _Language, exc: TranslationError) -> None:
         match = RETRY_HINT.search(str(exc))
@@ -252,7 +261,7 @@ class TranslationFanout:
         lang.rate_limited += 1
         detail = (
             f"rate limited (429): translation to {code} paused for {seconds:.0f}s; "
-            "captions show the original text"
+            "sentences are skipped in that language meanwhile"
         )
         self._log.warning(detail)
         if self._on_status is not None:

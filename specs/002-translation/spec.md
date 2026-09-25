@@ -65,3 +65,4 @@ The lenguaraz's job is that everyone understands in their own language. This fea
 ## Changelog
 - 2026-09-24T16:02Z created; Q1–Q4 resolved with defaults per CLAUDE.md §5 (logged in HUMAN_INBOX.md); Status Approved.
 - 2026-09-24T23:05Z FR-002-14 added: rate-limit cooldown and original text in degraded captions (the live demo on a free-tier project degraded ~30 % of translations to empty lines).
+- 2026-09-25T14:05Z Owner decision during the demo: each language view shows only its own language. FR-002-14 amended: a failed, timed-out or rate-limited translation is skipped in that language (counted as `translation_untranslated`), never shown as source text.

@@ -7,7 +7,8 @@ task ids refer to the specs under `specs/`; the full history is `git log`.
 
 ## [Unreleased]
 
-_Nothing yet._
+### Changed
+- Each language view shows only its own language: a failed, timed-out (`TRANSLATE_TIMEOUT_SECONDS`) or rate-limited translation is skipped in that language and counted (`translation_untranslated`), never replaced by the source text. Picker labels read "X (original audio)" / "Y (translation)".
 
 ## [1.0.0] - 2026-09-25
 

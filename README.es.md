@@ -33,8 +33,9 @@ escenario y cada persona lo entiende en su idioma.
   WebSocket con reconexión.
 - **Traducción en vivo** a cualquier cantidad de idiomas con `gemini-3.5-flash-lite`:
   en streaming, respetando el glosario, con las frases anteriores como contexto; solo se
-  traduce mientras alguien escucha (o si el idioma está en `ALWAYS_ON_LANGS`), y una falla de
-  traducción degrada al texto original en vez de silencio.
+  traduce mientras alguien escucha (o si el idioma está en `ALWAYS_ON_LANGS`). Cada vista muestra
+  solo su idioma: una frase cuya traducción falla o está limitada se omite en esa vista (se cuenta
+  en el panel de operación), nunca se reemplaza por otro idioma.
 - **Rotación de sesión sin cortes:** la Live API cierra la sesión a los ~10 minutos;
   la siguiente se abre antes, el cambio ocurre en una pausa y los finales se drenan y
   deduplican. Medido con el motor real: 0 frases perdidas, 0 duplicadas en rotaciones forzadas.

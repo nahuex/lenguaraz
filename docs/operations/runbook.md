@@ -57,7 +57,7 @@ curl -H "Authorization: Bearer $ADMIN_TOKEN" \
 | Wrong language transcribed | Captions in the wrong language, or garbled | Set `source_lang` for that stage (e.g. `["es-419"]`) instead of auto-detect; `Stop` + edit `stages.yaml` + restart the container. |
 | Bad glossary | A term is consistently wrong or the translation keeps a wrong spelling | Fix the term in `glossary` (max 100), restart the stage. Terms are data: they cannot break the prompt. |
 | Feed died (`STOPPED`, `ffmpeg exited`) | Detail shows the ffmpeg error | Fix the stream URL/encoder, press `Start`. |
-| Audience page empty for one language | Translated captions show the original with a "degraded" mark | That language's translations are failing (quota/outage); originals keep flowing; it retries with the next final. |
+| Audience page empty for one language | Sentences missing in a translated view | That language's translations are failing (quota/outage); originals keep flowing; it retries with the next final. |
 
 ## Restart and upgrade
 
@@ -79,7 +79,7 @@ and your project's concurrent-session quota; consider lowering `SESSION_ROTATE_S
 
 ## Translations pause with `rate limited (429)`
 
-**Symptom:** stage detail `rate limited (429): translation to es paused for 57s; captions show the original text`; the audience sees the original language with an `original` marker for about a minute.
+**Symptom:** stage detail `rate limited (429): translation to es paused for 57s; sentences are skipped in that language meanwhile`; that language skips sentences for about a minute; the original view is unaffected.
 
 **Cause:** the Gemini project is on the free tier for the text model (`generate_content_free_tier_requests`, 15 requests per minute). Two stages with progressive translation make 40–60 requests per minute.
 
@@ -87,7 +87,7 @@ and your project's concurrent-session quota; consider lowering `SESSION_ROTATE_S
 
 ## Everything is DEGRADED/STOPPED with 402
 
-**Symptom:** all stages fail at the same moment with detail `402 RESOURCE_EXHAUSTED: Your prepayment credits are depleted. Please go to AI Studio at https://ai.studio/projects`; translated captions show the original text; `make smoke-stt` fails with the same message. The key is valid and the network is fine.
+**Symptom:** all stages fail at the same moment with detail `402 RESOURCE_EXHAUSTED: Your prepayment credits are depleted. Please go to AI Studio at https://ai.studio/projects`; translated sentences are skipped in that language meanwhile; `make smoke-stt` fails with the same message. The key is valid and the network is fine.
 
 **Cause:** the project is Tier 1 on a Cloud Billing account with the **prepay** plan (the default for new accounts) and the prepay balance is USD 0. Every request, Live transcription and text alike, is refused until credits are bought; Google Cloud promotional credits on the account do not help on their own, because they are consumed only once an active prepay balance exists.
 

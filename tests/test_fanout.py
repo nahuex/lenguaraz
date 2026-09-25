@@ -151,9 +151,8 @@ async def test_persistent_failure_publishes_degraded_caption_and_status(bus: Mem
     es = bus.subscribe("main", lang="es")
     fanout.on_caption(caption(1, "No luck."))
     events = await drain(es, 0.3)
-    assert len(events) == 1
-    assert events[0].degraded is True and events[0].text == "No luck."
-    assert events[0].original == "No luck."  # degraded = the original text, never silence
+    assert events == []  # each language shows only its own language: the sentence is skipped
+    assert fanout.untranslated() == 1
     assert details and "translation to es failed" in details[0] and "upstream" in details[0]
     assert len(translator.requests) == 4  # 1 + 3 retries
     await fanout.stop()
@@ -165,7 +164,7 @@ async def test_non_retryable_error_degrades_immediately(bus: MemoryBus) -> None:
     es = bus.subscribe("main", lang="es")
     fanout.on_caption(caption(1, "Bad request."))
     events = await drain(es, 0.2)
-    assert events[0].degraded is True and len(translator.requests) == 1
+    assert events == [] and len(translator.requests) == 1 and fanout.untranslated() == 1
     await fanout.stop()
 
 
@@ -190,16 +189,16 @@ async def test_rate_limit_pauses_translation_and_shows_the_original(bus: MemoryB
     es = bus.subscribe("main", lang="es")
     fanout.on_caption(caption(1, "First."))
     events = await drain(es, 0.2)
-    assert [(e.text, e.degraded) for e in events] == [("First.", True)]
+    assert events == []  # skipped, not shown in Spanish as Spanish-less text
     assert len(translator.requests) == 1  # no retries on 429
     assert details and "rate limited (429)" in details[0] and "40s" in details[0]
 
     fanout.on_caption(caption(2, "A partial sentence with enough words to translate", final=False))
     fanout.on_caption(caption(3, "Third."))
     events = await drain(es, 0.2)
-    assert [(e.text, e.degraded) for e in events] == [("Third.", True)]  # partial skipped
+    assert events == []  # paused: nothing published in this language
     assert len(translator.requests) == 1  # nothing sent while paused
-    assert fanout.rate_limited() == 1
+    assert fanout.rate_limited() == 1 and fanout.untranslated() == 2
 
     now[0] += 41.0
     fanout.on_caption(caption(4, "Fourth."))
@@ -217,6 +216,6 @@ async def test_slow_translation_times_out_and_degrades_without_blocking(bus: Mem
     es = bus.subscribe("main", lang="es")
     fanout.on_caption(caption(1, "Slow one."))
     events = await drain(es, 1.0)
-    assert [(e.text, e.degraded) for e in events] == [("Slow one.", True)]
+    assert events == [] and fanout.untranslated() == 1
     assert len(translator.requests) == 1  # no retries on a timeout
     await fanout.stop()

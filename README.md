@@ -32,8 +32,9 @@ understands it in their own language.
   dark mode, screen-reader friendly captions, reconnecting WebSocket.
 - **Live translation** into any number of target languages with `gemini-3.5-flash-lite`:
   streamed, glossary-aware, with the previous sentences as context; languages are translated
-  only while someone is listening (or listed in `ALWAYS_ON_LANGS`), and a translation failure
-  degrades to the source text instead of silence.
+  only while someone is listening (or listed in `ALWAYS_ON_LANGS`). Each language view shows
+  only its own language: a sentence whose translation fails or is rate-limited is left out of
+  that view (counted in the operator dashboard), never replaced by another language.
 - **Seamless session rotation:** the Live API closes a session after ~10 minutes; the
   next one is opened before that, the switch happens at a pause, and finals are drained and
   de-duplicated. Measured on the real engine: 0 lost, 0 duplicated sentences across forced

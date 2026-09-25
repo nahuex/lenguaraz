@@ -22,16 +22,3 @@ stages:
       abstract: "Un servicio de transcripción y traducción por escenario, con TaskGroup, backpressure y Gemini Live."
     glossary: ["asyncio", "TaskGroup", "backpressure", "ffmpeg", "WebSocket", "Gemini", "Docker", "Kubernetes", "eBPF", "Nerdearla"]
     loop: true
-
-  # Demo-day stage: a real Nerdearla talk played in the browser, captured by OBS (desktop audio)
-  # and streamed here over SRT. Local only, not committed.
-  - id: charla
-    name: "Nerdearla talk (live from OBS)"
-    source: "srt://0.0.0.0:9000?mode=listener&latency=200000"
-    source_lang: ["es-419"]
-    targets: ["en", "pt"]
-    talk:
-      title: "Nerdearla talk"
-      abstract: "A technical talk from a previous Nerdearla edition, streamed live from the browser through OBS."
-    glossary: ["Nerdearla", "Kubernetes", "Docker", "Python", "JavaScript", "TypeScript", "Linux", "API", "DevOps", "Cloud", "AWS", "Google Cloud", "Gemini", "open source"]
-
