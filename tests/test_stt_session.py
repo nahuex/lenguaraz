@@ -568,3 +568,32 @@ async def test_a_multi_sentence_server_final_becomes_one_line_per_sentence() -> 
     assert finals == [(0, "La idea es seguir con ADK."), (1, "Si vinieron ayer, bienvenidos.")]
     await queue.put(None)
     await asyncio.wait_for(task, 2)
+
+
+async def test_short_fragment_at_a_pause_waits_for_the_rest_of_the_sentence() -> None:
+    session = ScriptedSttSession(
+        [
+            (0.02, SttEvent.interim("gave developers")),
+            (0.35, SttEvent.interim("gave developers access to the product catalog.")),
+        ],
+        hold_open=True,
+    )
+    recorder = Recorder()
+    queue: asyncio.Queue[bytes | None] = asyncio.Queue()
+    manager = managed(
+        ScriptedSttEngine([session]),
+        recorder,
+        vad_silence_ms=40,
+        final_timeout=0.15,
+        stall_seconds=0,
+    )
+    task = asyncio.create_task(manager.run(queue))
+    await asyncio.sleep(0.05)
+    await queue.put(LOUD)
+    for _ in range(3):
+        await queue.put(CHUNK)  # pause after "gave developers": too short to close
+    await wait_until(lambda: any(s.is_final for s in recorder.segments), timeout=2.0)
+    finals = [s.text for s in recorder.segments if s.is_final]
+    assert finals == ["gave developers access to the product catalog."]
+    await queue.put(None)
+    await asyncio.wait_for(task, 2)

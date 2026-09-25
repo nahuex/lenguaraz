@@ -82,6 +82,7 @@ SENTENCE_END = re.compile(
 )
 CLAUSE_END = re.compile(r"[,;:]")
 MAX_SEGMENT_WORDS = 28
+PROMOTE_MIN_WORDS = 6  # shorter fragments without punctuation wait for more words
 HARD_CUT_WORDS = 20
 TAIL_WORDS = 12
 
@@ -457,13 +458,23 @@ class ManagedSttSession:
         since = self._await_final_since
         if since is None or self._active is None:
             return
-        if self._clock() - since < self._final_timeout:
+        elapsed = self._clock() - since
+        if elapsed < self._final_timeout:
             return
-        self._await_final_since = None
         # the speaker may have kept going after the pause: commit everything heard so far so
         # the final is not frozen at the pause (seen 2026-09-25: truncated promoted finals)
         cumulative = self._last_interim_text.strip() or self._await_final_text.strip()
         _, text = self._split_committed(cumulative)
+        if (
+            text
+            and not re.search(r"[.?!…]$", text)
+            and len(_WORD.findall(text)) < PROMOTE_MIN_WORDS
+            and elapsed < self._final_timeout * 3
+        ):
+            # a short fragment at a mid-sentence pause ("catalog", "Joined"): wait for more
+            # words so the sentence is translated whole (fragments translate badly)
+            return
+        self._await_final_since = None
         if not text:
             return
         emitted = self._emit_final_sentences(
