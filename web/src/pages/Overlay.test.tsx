@@ -146,8 +146,8 @@ describe('Overlay', () => {
     expect(screen.queryByRole('link')).toBeNull();
     expect(screen.queryByRole('button')).toBeNull();
 
-    // The DRY-RUN tag appears once /api/stages reports dry_run.
-    expect(await screen.findByText('DRY-RUN')).toBeInTheDocument();
+    // The dry-run tag appears once /api/stages reports dry_run.
+    expect(await screen.findByText('Dry run · simulated captions, no API key')).toBeInTheDocument();
     expect(screen.queryByRole('alert')).toBeNull();
   });
 
@@ -157,8 +157,9 @@ describe('Overlay', () => {
       FakeSocket.instances[0]?.serverClose(4404, 'no such stage');
     });
     const alert = screen.getByRole('alert');
-    expect(alert).toHaveTextContent('unknown stage');
-    expect(alert).toHaveTextContent('ghost');
+    expect(alert).toHaveTextContent("Lenguaraz overlay: stage 'ghost' was not found.");
+    // The raw close reason is never echoed on the stream.
+    expect(alert).not.toHaveTextContent('no such stage');
   });
 
   it('cleans the overlay attribute up on unmount', () => {

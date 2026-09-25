@@ -30,11 +30,13 @@ log = logging.getLogger("lenguaraz.api")
 
 PLACEHOLDER_HTML = """<!doctype html><html lang="en"><head><meta charset="utf-8">
 <title>Lenguaraz</title></head><body style="font-family:system-ui;padding:2rem">
-<h1>Lenguaraz</h1><p>The API is up, but the audience view is not built yet.</p>
-<p>Run <code>cd web &amp;&amp; npm install &amp;&amp; npm run build</code>, or start the dev server
-with <code>cd web &amp;&amp; npm run dev</code> and open <a href="http://localhost:5173">http://localhost:5173</a>.</p>
-<p>Endpoints: <a href="/healthz">/healthz</a> · <a href="/api/stages">/api/stages</a> ·
-<code>ws://…/ws/{stage_id}?lang=</code></p></body></html>"""
+<h1>Lenguaraz</h1><p>Lenguaraz is running, but the web app is not built yet.</p>
+<p>Run <code>make web</code>
+(or <code>cd web &amp;&amp; npm install &amp;&amp; npm run build</code>),
+or start the dev server with <code>cd web &amp;&amp; npm run dev</code> and open
+<a href="http://localhost:5173">http://localhost:5173</a>.</p>
+<p>Available now: <a href="/healthz">/healthz</a> · <a href="/api/stages">/api/stages</a></p>
+</body></html>"""
 
 
 def default_web_dist() -> Path:

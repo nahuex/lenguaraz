@@ -90,7 +90,7 @@ function renderPage() {
 
 function connectWith(token: string): void {
   fireEvent.change(screen.getByLabelText('Admin token'), { target: { value: token } });
-  fireEvent.click(screen.getByRole('button', { name: 'Connect' }));
+  fireEvent.click(screen.getByRole('button', { name: 'Sign in' }));
 }
 
 describe('helpers', () => {
@@ -119,9 +119,12 @@ describe('Admin', () => {
     stubFetch(200);
     renderPage();
 
-    expect(screen.getByRole('heading', { name: 'Admin' })).toBeInTheDocument();
+    expect(screen.getByRole('heading', { name: 'Operator dashboard' })).toBeInTheDocument();
     expect(screen.getByLabelText('Admin token')).toHaveAttribute('type', 'password');
-    expect(screen.getByRole('button', { name: 'Connect' })).toBeInTheDocument();
+    expect(screen.getByLabelText('Admin token')).toHaveAccessibleDescription(
+      "The ADMIN_TOKEN value from the server's .env",
+    );
+    expect(screen.getByRole('button', { name: 'Sign in' })).toBeInTheDocument();
     expect(screen.queryByRole('table')).toBeNull();
     expect(screen.queryByRole('region', { name: 'Stages' })).toBeNull();
 
@@ -136,7 +139,7 @@ describe('Admin', () => {
 
     expect(await screen.findByRole('alert')).toHaveTextContent('Invalid token');
     expect(window.sessionStorage.getItem(ADMIN_TOKEN_KEY)).toBeNull();
-    expect(screen.getByRole('button', { name: 'Connect' })).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Sign in' })).toBeInTheDocument();
     expect(screen.queryByRole('table')).toBeNull();
   });
 
@@ -147,6 +150,14 @@ describe('Admin', () => {
 
     const table = await screen.findByRole('table');
     expect(window.sessionStorage.getItem(ADMIN_TOKEN_KEY)).toBe('secret');
+    expect(screen.getByRole('button', { name: 'Sign out' })).toBeInTheDocument();
+    // Operator vocabulary in the column headers (same text at every width).
+    expect(
+      within(table).getByText('Latency p50 / p95 (ms)', { selector: 'th' }),
+    ).toBeInTheDocument();
+    expect(
+      within(table).getByText('Rotations · Errors · Duplicates · Dropped', { selector: 'th' }),
+    ).toBeInTheDocument();
     expect(within(table).getByText('Main Stage', { selector: 'strong' })).toBeInTheDocument();
     expect(within(table).getByText('Workshop Room', { selector: 'strong' })).toBeInTheDocument();
 

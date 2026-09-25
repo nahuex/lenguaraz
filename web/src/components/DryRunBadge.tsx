@@ -8,7 +8,7 @@ export function DryRunBadge() {
       className="inline-flex items-center gap-2 rounded-md border border-line bg-surface-raised px-3 py-1.5 text-sm font-semibold"
     >
       <span aria-hidden="true" className="inline-block h-2.5 w-2.5 rounded-full bg-[#f59e0b]" />
-      DRY-RUN · fake engine, no credentials
+      Dry run · simulated captions, no API key
     </p>
   );
 }

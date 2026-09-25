@@ -23,7 +23,9 @@ function Toggle({ label, checked, onChange }: ToggleProps) {
       aria-checked={checked}
       onClick={() => onChange(!checked)}
       className={`rounded-md border px-3 py-1.5 text-sm font-medium ${
-        checked ? 'border-accent bg-accent text-accent-ink' : 'border-line bg-surface-raised text-ink'
+        checked
+          ? 'border-accent bg-accent text-accent-ink'
+          : 'border-line bg-surface-raised text-ink'
       }`}
     >
       {label}
@@ -42,7 +44,7 @@ export function A11yControls() {
   return (
     <div role="group" aria-label="Display settings" className="flex flex-wrap items-end gap-4">
       <fieldset className="flex flex-wrap items-center gap-2">
-        <legend className="mb-1 w-full text-sm font-semibold text-ink-muted">Caption font size</legend>
+        <legend className="mb-1 w-full text-sm font-semibold text-ink-muted">Font size</legend>
         {FONT_SIZES.map((size) => {
           const checked = prefs.fontSize === size;
           return (
@@ -50,13 +52,16 @@ export function A11yControls() {
               key={size}
               title={FONT_SIZE_TITLES[size]}
               className={`cursor-pointer rounded-md border px-3 py-1.5 text-sm font-medium has-[:focus-visible]:outline-3 has-[:focus-visible]:outline-offset-2 has-[:focus-visible]:outline-focus ${
-                checked ? 'border-accent bg-accent text-accent-ink' : 'border-line bg-surface-raised text-ink'
+                checked
+                  ? 'border-accent bg-accent text-accent-ink'
+                  : 'border-line bg-surface-raised text-ink'
               }`}
             >
               <input
                 type="radio"
                 name={`font-size-${groupId}`}
                 value={size}
+                aria-label={FONT_SIZE_TITLES[size]}
                 checked={checked}
                 onChange={() => setPref('fontSize', size)}
                 className="sr-only"

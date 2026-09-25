@@ -173,8 +173,8 @@ const HEADERS = [
   'Listeners',
   'Active languages',
   'Captions',
-  'Latency (ms)',
-  'Rotations / errors / dups / dropped',
+  'Latency p50 / p95 (ms)',
+  'Rotations · Errors · Duplicates · Dropped',
   'Tokens (in / out)',
   'Cost (USD)',
   'Actions',
@@ -190,7 +190,10 @@ interface CellProps {
 /** Table cell that becomes a labelled block on phones (the table turns into cards). */
 function Cell({ label, children, className = '' }: CellProps) {
   return (
-    <td role="cell" className={`block py-1 md:table-cell md:px-3 md:py-2 md:align-top ${className}`}>
+    <td
+      role="cell"
+      className={`block py-1 md:table-cell md:px-3 md:py-2 md:align-top ${className}`}
+    >
       <span className="mr-2 inline-block min-w-[9rem] text-xs font-semibold uppercase tracking-wide text-ink-muted md:hidden">
         {label}
       </span>
@@ -214,9 +217,10 @@ export function Admin() {
   const [actionError, setActionError] = useState<string | null>(null);
   const [exportLang, setExportLang] = useState<Record<string, string>>({});
   const tokenInputId = useId();
+  const tokenHintId = `${tokenInputId}-hint`;
 
   useEffect(() => {
-    document.title = 'Admin · Lenguaraz';
+    document.title = 'Operator dashboard · Lenguaraz';
   }, []);
 
   useEffect(() => {
@@ -278,7 +282,9 @@ export function Admin() {
     const current = token;
     void withPending(stage.id, async () => {
       const result =
-        action === 'start' ? await startStage(current, stage.id) : await stopStage(current, stage.id);
+        action === 'start'
+          ? await startStage(current, stage.id)
+          : await stopStage(current, stage.id);
       patch(result);
       refresh();
     });
@@ -313,8 +319,7 @@ export function Admin() {
       </nav>
 
       <header className="flex flex-col gap-2">
-        <h1 className="text-2xl font-bold tracking-tight">Admin</h1>
-        <p className="text-ink-muted">Operator dashboard</p>
+        <h1 className="text-2xl font-bold tracking-tight">Operator dashboard</h1>
         <p className="text-sm text-ink-muted">
           {health !== null
             ? `Backend: engine ${health.engine} · ${health.stages} ${
@@ -342,17 +347,21 @@ export function Admin() {
             value={draft}
             onChange={(event) => setDraft(event.target.value)}
             disabled={token !== null}
-            placeholder={token !== null ? 'connected' : 'ADMIN_TOKEN from the server .env'}
+            placeholder={token !== null ? 'Signed in' : undefined}
+            aria-describedby={tokenHintId}
             className="w-full rounded-md border border-line bg-surface px-3 py-1.5 text-ink disabled:opacity-60"
           />
+          <p id={tokenHintId} className="text-xs text-ink-muted">
+            {"The ADMIN_TOKEN value from the server's .env"}
+          </p>
         </div>
         {token === null ? (
           <button type="submit" className={BUTTON_PRIMARY}>
-            Connect
+            Sign in
           </button>
         ) : (
           <button type="button" className={BUTTON_PLAIN} onClick={() => clearToken(null)}>
-            Disconnect
+            Sign out
           </button>
         )}
         {authError !== null && (
@@ -365,12 +374,18 @@ export function Admin() {
       {token !== null && (
         <section aria-label="Stages" className="flex flex-col gap-3">
           {error !== null && (
-            <p role="alert" className="truncate rounded-md border border-line bg-surface-raised px-3 py-2 text-sm">
+            <p
+              role="alert"
+              className="truncate rounded-md border border-line bg-surface-raised px-3 py-2 text-sm"
+            >
               Stage list unavailable ({error}). Retrying every {POLL_MS / 1000} seconds.
             </p>
           )}
           {actionError !== null && (
-            <p role="alert" className="truncate rounded-md border border-line bg-surface-raised px-3 py-2 text-sm">
+            <p
+              role="alert"
+              className="truncate rounded-md border border-line bg-surface-raised px-3 py-2 text-sm"
+            >
               Request failed: {actionError}
             </p>
           )}
@@ -420,7 +435,7 @@ export function Admin() {
                           <span className="ml-2 font-mono text-xs text-ink-muted">{stage.id}</span>
                           {stage.dry_run && (
                             <span className="ml-2 rounded-sm border border-line px-1.5 py-0.5 text-xs font-semibold">
-                              DRY-RUN
+                              Dry run
                             </span>
                           )}
                         </Cell>
@@ -442,7 +457,7 @@ export function Admin() {
                             : '—'}
                         </Cell>
                         <Cell label="Captions">{formatInt(stage.captions_final)}</Cell>
-                        <Cell label="Latency (ms)">
+                        <Cell label="Latency p50 / p95 (ms)">
                           <span className="whitespace-nowrap">
                             {formatMs(stage.p50_ms)} / {formatMs(stage.p95_ms)}
                           </span>
@@ -450,10 +465,11 @@ export function Admin() {
                             interim p95 {formatMs(stage.interim_p95_ms)}
                           </span>
                         </Cell>
-                        <Cell label="Rot / err / dups / dropped">
+                        <Cell label="Rotations · Errors · Duplicates · Dropped">
                           <span className="whitespace-nowrap">
-                            {formatInt(stage.rotations)} / {formatInt(stage.errors)} /{' '}
-                            {formatInt(stage.duplicates_dropped)} / {formatInt(stage.chunks_dropped)}
+                            {formatInt(stage.rotations)} · {formatInt(stage.errors)} ·{' '}
+                            {formatInt(stage.duplicates_dropped)} ·{' '}
+                            {formatInt(stage.chunks_dropped)}
                           </span>
                         </Cell>
                         <Cell label="Tokens (in / out)">
@@ -462,7 +478,9 @@ export function Admin() {
                           </span>
                         </Cell>
                         <Cell label="Cost (USD)">
-                          <span className="whitespace-nowrap font-mono">{formatCost(stage.est_cost_usd)}</span>
+                          <span className="whitespace-nowrap font-mono">
+                            {formatCost(stage.est_cost_usd)}
+                          </span>
                         </Cell>
                         <Cell label="Actions">
                           <span className="inline-flex flex-wrap gap-2">
@@ -495,15 +513,20 @@ export function Admin() {
                               id={selectId}
                               value={lang}
                               onChange={(event) =>
-                                setExportLang((prev) => ({ ...prev, [stage.id]: event.target.value }))
+                                setExportLang((prev) => ({
+                                  ...prev,
+                                  [stage.id]: event.target.value,
+                                }))
                               }
                               className="rounded-md border border-line bg-surface px-2 py-1 text-sm text-ink"
                             >
-                              {(stage.languages.length > 0 ? stage.languages : [lang]).map((code) => (
-                                <option key={code} value={code}>
-                                  {languageLabel(code)}
-                                </option>
-                              ))}
+                              {(stage.languages.length > 0 ? stage.languages : [lang]).map(
+                                (code) => (
+                                  <option key={code} value={code}>
+                                    {languageLabel(code)}
+                                  </option>
+                                ),
+                              )}
                             </select>
                             {EXPORT_FORMATS.map((format) => (
                               <button

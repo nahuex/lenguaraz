@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: Apache-2.0
 import { Link } from 'react-router-dom';
 import type { Stage } from '../lib/api';
-import { deriveShortCode, languageLabel } from '../lib/lang';
+import { buildLanguageOptions, deriveShortCode, languageLabel } from '../lib/lang';
 import { StateBadge } from './StateBadge';
 
 interface StageCardProps {
@@ -9,9 +9,12 @@ interface StageCardProps {
 }
 
 export function StageCard({ stage }: StageCardProps) {
-  const sources = stage.source_lang.map(
-    (tag) => `${languageLabel(deriveShortCode(tag))} (${tag})`,
+  // Language names only (no BCP-47 tags): "English", not "English (en-US)".
+  const spoken = Array.from(
+    new Set(stage.source_lang.map((tag) => languageLabel(deriveShortCode(tag)))),
   );
+  // Sources first, then translation targets, without duplicates.
+  const captionsIn = buildLanguageOptions(stage).map((option) => option.label);
   const headingId = `stage-${stage.id}-name`;
   const firstSource = stage.source_lang[0];
   const overlayHref = firstSource
@@ -31,11 +34,11 @@ export function StageCard({ stage }: StageCardProps) {
       </div>
       {stage.detail && <p className="text-sm text-ink-muted">{stage.detail}</p>}
       <dl className="grid grid-cols-[auto_1fr] gap-x-3 gap-y-1 text-sm">
-        <dt className="text-ink-muted">Source</dt>
-        <dd>{sources.length > 0 ? sources.join(', ') : '—'}</dd>
-        <dt className="text-ink-muted">Targets</dt>
-        <dd>{stage.targets.length > 0 ? stage.targets.map(languageLabel).join(', ') : '—'}</dd>
-        <dt className="text-ink-muted">Listeners</dt>
+        <dt className="text-ink-muted">Spoken language</dt>
+        <dd>{spoken.length > 0 ? spoken.join(', ') : '—'}</dd>
+        <dt className="text-ink-muted">Captions in</dt>
+        <dd>{captionsIn.length > 0 ? captionsIn.join(', ') : '—'}</dd>
+        <dt className="text-ink-muted">Watching now</dt>
         <dd>{stage.listeners}</dd>
       </dl>
       <div className="mt-auto flex flex-wrap items-center gap-x-4 gap-y-2">

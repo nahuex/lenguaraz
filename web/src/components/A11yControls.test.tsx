@@ -12,18 +12,20 @@ describe('A11yControls', () => {
 
   it('persists font size L and applies it as a data attribute', () => {
     render(<A11yControls />);
-    fireEvent.click(screen.getByRole('radio', { name: 'L' }));
+    fireEvent.click(screen.getByRole('radio', { name: 'Large' }));
 
     expect(window.localStorage.getItem('lenguaraz.fontSize')).toBe('L');
     expect(document.documentElement.dataset.fontSize).toBe('L');
-    expect(screen.getByRole('radio', { name: 'L' })).toBeChecked();
+    expect(screen.getByRole('radio', { name: 'Large' })).toBeChecked();
   });
 
   it('restores the persisted font size on load', () => {
     window.localStorage.setItem('lenguaraz.fontSize', 'XL');
     reloadPrefs();
     render(<A11yControls />);
-    expect(screen.getByRole('radio', { name: 'XL' })).toBeChecked();
+    expect(screen.getByRole('radio', { name: 'Extra large' })).toBeChecked();
+    // The visible label stays the short form; the accessible name is the full word.
+    expect(screen.getByText('XL')).toBeInTheDocument();
   });
 
   it('toggles high contrast, theme and show-original with persistence', () => {

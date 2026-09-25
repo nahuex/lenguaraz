@@ -13,23 +13,40 @@ import {
   type CaptionState,
   type ConnectionState,
 } from '../lib/captions';
+import type { StageState } from '../lib/api';
 import { buildLanguageOptions } from '../lib/lang';
 import { usePrefs } from '../lib/prefs';
 import { useStages } from '../lib/useStages';
 
 const LINE_OPTIONS = [2, 3, 5] as const;
 
+/** Audience-facing connection state: one sentence-case phrase, no technical detail. */
 function connectionLabel(connection: ConnectionState): string {
   switch (connection.status) {
     case 'connecting':
-      return 'connecting';
+      return 'Connecting…';
     case 'live':
-      return 'live';
+      return 'Live';
     case 'reconnecting':
-      return `reconnecting (attempt ${connection.attempt})`;
+      return 'Reconnecting…';
     case 'error':
-      return `error: ${connection.message ?? 'connection failed'}`;
+      return 'Connection failed';
   }
+}
+
+/**
+ * Audience-facing copy per stage state. LIVE and ROTATING (an internal session
+ * handoff) show no banner; the raw `detail` string is never rendered here.
+ */
+const STATUS_COPY: Partial<Record<StageState, string>> = {
+  IDLE: "Captions haven't started yet.",
+  STARTING: 'Captions are starting…',
+  DEGRADED: 'Captions are running with reduced quality.',
+  STOPPED: 'Captions have ended for this stage.',
+};
+
+function formatSeconds(ms: number): string {
+  return (ms / 1000).toFixed(1);
 }
 
 const CONNECTION_DOT: Record<ConnectionState['status'], string> = {
@@ -60,7 +77,9 @@ export function LiveCaptions() {
   });
 
   useEffect(() => {
-    document.title = stage ? `Live captions · ${stage.name} · Lenguaraz` : 'Live captions · Lenguaraz';
+    document.title = stage
+      ? `Live captions · ${stage.name} · Lenguaraz`
+      : 'Live captions · Lenguaraz';
   }, [stage]);
 
   useEffect(() => {
@@ -81,6 +100,7 @@ export function LiveCaptions() {
   };
 
   const status = captions.status ?? (stage ? { state: stage.state, detail: stage.detail } : null);
+  const statusCopy = status === null ? null : (STATUS_COPY[status.state] ?? null);
   const stageMissing = stages !== null && stage === null;
 
   return (
@@ -97,15 +117,13 @@ export function LiveCaptions() {
             <DryRunBadge />
           </div>
         )}
-        <h1 className="text-2xl font-bold tracking-tight">
-          {stage?.name ?? stageId}
-        </h1>
+        <h1 className="text-2xl font-bold tracking-tight">{stage?.name ?? stageId}</h1>
         <p role="status" className="flex items-center gap-2 text-sm text-ink-muted">
           <span
             aria-hidden="true"
             className={`inline-block h-2.5 w-2.5 rounded-full ${CONNECTION_DOT[connection.status]}`}
           />
-          Connection: {connectionLabel(connection)}
+          {connectionLabel(connection)}
         </p>
       </header>
 
@@ -125,16 +143,13 @@ export function LiveCaptions() {
         </p>
       )}
 
-      {status !== null && status.state !== 'LIVE' && (
+      {status !== null && statusCopy !== null && (
         <div
           role="status"
           className="flex flex-wrap items-center gap-3 rounded-md border border-line bg-surface-raised px-4 py-3"
         >
           <StateBadge state={status.state} />
-          <span>
-            Stage is {status.state.toLowerCase()}
-            {status.detail ? ` — ${status.detail}` : ''}
-          </span>
+          <span>{statusCopy}</span>
         </div>
       )}
 
@@ -151,14 +166,18 @@ export function LiveCaptions() {
 
       <div className="flex flex-wrap items-end gap-4">
         <fieldset className="flex flex-wrap items-center gap-2">
-          <legend className="mb-1 w-full text-sm font-semibold text-ink-muted">Caption lines</legend>
+          <legend className="mb-1 w-full text-sm font-semibold text-ink-muted">
+            Caption lines
+          </legend>
           {LINE_OPTIONS.map((count) => {
             const checked = lines === count;
             return (
               <label
                 key={count}
                 className={`cursor-pointer rounded-md border px-3 py-1.5 text-sm font-medium has-[:focus-visible]:outline-3 has-[:focus-visible]:outline-offset-2 has-[:focus-visible]:outline-focus ${
-                  checked ? 'border-accent bg-accent text-accent-ink' : 'border-line bg-surface-raised text-ink'
+                  checked
+                    ? 'border-accent bg-accent text-accent-ink'
+                    : 'border-line bg-surface-raised text-ink'
                 }`}
               >
                 <input
@@ -177,10 +196,10 @@ export function LiveCaptions() {
         <A11yControls />
       </div>
 
-      {captions.metrics && (
+      {captions.metrics && captions.metrics.p50_ms > 0 && (
         <p className="text-sm text-ink-muted">
-          Latency p50 {captions.metrics.p50_ms} ms · p95 {captions.metrics.p95_ms} ms · rotations{' '}
-          {captions.metrics.rotations} · errors {captions.metrics.errors}
+          Caption delay: about {formatSeconds(captions.metrics.p50_ms)} s (typical),{' '}
+          {formatSeconds(captions.metrics.p95_ms)} s (peak)
         </p>
       )}
     </div>

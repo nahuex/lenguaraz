@@ -2,6 +2,7 @@
 import { useEffect, useMemo, useState } from 'react';
 import { useParams, useSearchParams } from 'react-router-dom';
 import {
+  FATAL_CLOSE_CODES,
   applyEvent,
   connectCaptions,
   initialCaptionState,
@@ -42,9 +43,7 @@ const SIZES: readonly OverlaySize[] = ['s', 'm', 'l', 'xl'];
 
 export function parseOverlayOptions(params: URLSearchParams): OverlayOptions {
   const rawLines = Number.parseInt(params.get('lines') ?? '', 10);
-  const lines = Number.isFinite(rawLines)
-    ? Math.min(MAX_LINES, Math.max(MIN_LINES, rawLines))
-    : 2;
+  const lines = Number.isFinite(rawLines) ? Math.min(MAX_LINES, Math.max(MIN_LINES, rawLines)) : 2;
   const rawSize = (params.get('size') ?? '').toLowerCase();
   const size = (SIZES as readonly string[]).includes(rawSize) ? (rawSize as OverlaySize) : 'l';
   const align = params.get('align') === 'top' ? 'top' : 'bottom';
@@ -57,6 +56,33 @@ export function overlayFontSize(size: OverlaySize): string {
   const px = OVERLAY_FONT_PX[size];
   const vw = (px / SCALE_BELOW_PX) * 100;
   return `min(${px}px, ${vw.toFixed(3)}vw)`;
+}
+
+function reasonIs(message: string, code: number): boolean {
+  const prefix = FATAL_CLOSE_CODES[code];
+  return prefix !== undefined && message.startsWith(prefix);
+}
+
+/**
+ * One sentence for the stream operator when the URL is wrong or the backend
+ * refuses the connection. Names the product; never echoes the raw close reason.
+ */
+export function overlayErrorLine(
+  reason: string | undefined,
+  stageId: string,
+  lang: string | null,
+): string {
+  const message = reason ?? '';
+  if (reasonIs(message, 4404)) {
+    return `Lenguaraz overlay: stage '${stageId}' was not found.`;
+  }
+  if (reasonIs(message, 4400)) {
+    return `Lenguaraz overlay: language '${lang ?? '?'}' is not available on stage '${stageId}'.`;
+  }
+  if (reasonIs(message, 4429)) {
+    return `Lenguaraz overlay: stage '${stageId}' is not accepting more viewers right now.`;
+  }
+  return `Lenguaraz overlay: cannot connect to stage '${stageId}'.`;
 }
 
 export function Overlay() {
@@ -106,9 +132,9 @@ export function Overlay() {
   const stageMissing = stages !== null && stage === null;
   const errorLine =
     connection.status === 'error'
-      ? `Overlay: ${connection.message ?? 'connection failed'} (stage "${stageId}", lang "${lang ?? '?'}")`
+      ? overlayErrorLine(connection.message, stageId, lang)
       : stageMissing
-        ? `Overlay: unknown stage "${stageId}"`
+        ? `Lenguaraz overlay: stage '${stageId}' was not found.`
         : null;
 
   const visible = captions.finals.slice(-options.lines);
@@ -121,11 +147,7 @@ export function Overlay() {
           {errorLine}
         </p>
       )}
-      {stage?.dry_run && (
-        <p className="overlay-tag" aria-label="Dry run: fake engine">
-          DRY-RUN
-        </p>
-      )}
+      {stage?.dry_run && <p className="overlay-tag">Dry run · simulated captions, no API key</p>}
       {hasText && (
         <section
           aria-label="Captions"

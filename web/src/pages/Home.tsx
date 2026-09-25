@@ -21,8 +21,10 @@ export function Home() {
             <DryRunBadge />
           </div>
         )}
-        <h1 className="text-3xl font-bold tracking-tight">Lenguaraz</h1>
-        <p className="text-lg text-ink-muted">the open-source interpreter for every stage</p>
+        <h1 className="text-3xl font-bold tracking-tight">Stages</h1>
+        <p className="text-lg text-ink-muted">
+          Pick a stage to follow live captions in your language.
+        </p>
       </header>
 
       {error && (
@@ -34,11 +36,14 @@ export function Home() {
       {stages === null && !error && <p className="text-ink-muted">Loading stages…</p>}
 
       {stages !== null && stages.length === 0 && (
-        <p className="text-ink-muted">No stages configured yet.</p>
+        <p className="text-ink-muted">No stages are configured yet.</p>
       )}
 
       {stages !== null && stages.length > 0 && (
-        <section aria-label="Stages" className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3">
+        <section
+          aria-label="Stages"
+          className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3"
+        >
           {stages.map((stage) => (
             <StageCard key={stage.id} stage={stage} />
           ))}
@@ -47,7 +52,7 @@ export function Home() {
 
       <p className="text-sm text-ink-muted">
         <Link to="/admin" className="underline hover:text-ink">
-          Admin · operator dashboard
+          Operator dashboard
         </Link>
       </p>
     </div>
