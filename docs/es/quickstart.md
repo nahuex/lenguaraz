@@ -50,12 +50,20 @@ stages:
     name: "Escenario principal"
     source: "srt://0.0.0.0:9000?mode=listener"   # o una URL HLS, rtmp://, un archivo…
     source_lang: ["es-419"]
-    targets: ["en", "pt-BR"]
+    targets: ["en", "pt"]            # códigos cortos: en, es, pt
     glossary: ["Kubernetes", "eBPF", "NombreDeTuProducto"]
 ```
 
-Reiniciá el contenedor (`docker compose restart`). Compartí
-`http://<tu-host>:8000/live/main` con la audiencia. Cualquier cosa que ffmpeg pueda leer
+Reiniciá el contenedor (`docker compose restart`).
+
+Para compartirlo con la audiencia poné HTTPS adelante: el stack de Compose escucha solo en
+`127.0.0.1:8000`, y `docker compose --profile tls up -d` (con `DOMAIN` y `ACME_EMAIL` en
+`.env`) obtiene un certificado de Let's Encrypt; o usá el tuyo con `TLS_CERT_FILE`/`TLS_KEY_FILE`
+(los dos caminos en `docs/deploy/production.md`, sección 3). Para una demo en HTTP dentro de una
+red local, publicá el puerto con un `docker-compose.override.yml`
+(`ports: !override ["8000:8000"]`) y compartí `http://<tu-host>:8000/live/main`.
+
+Cualquier cosa que ffmpeg pueda leer
 sirve como `source`; `docs/deploy/audio-sources.md` tiene recetas para OBS, vMix, HLS y SRT.
 Para un despliegue público con TLS, `docs/deploy/production.md`; para Google Cloud,
 `docs/deploy/cloud-run.md`.

@@ -30,6 +30,11 @@ understands it in their own language.
   (`IDLE · STARTING · LIVE · ROTATING · DEGRADED · STOPPED`) and automatic reconnection.
 - **Live captions page (audience view):** stage and language picker, font size, high contrast,
   dark mode, screen-reader friendly captions, reconnecting WebSocket.
+- **Near-real-time translation:** hedged requests, parallel in-order translation, sentence
+  segmentation of live partials and reuse of partial translations keep the translated sentence
+  within about a second of the original even when the model queues some requests (measured
+  live: median 0.6 s es→en, 0.8 s en→pt; `docs/metrics.md`).
+- **HTTPS** with your own certificate or an automatic Let's Encrypt one (Compose profile `tls`).
 - **Live translation** into any number of target languages with `gemini-3.5-flash-lite`:
   streamed, glossary-aware, with the previous sentences as context; languages are translated
   only while someone is listening (or listed in `ALWAYS_ON_LANGS`). Each language view shows
@@ -64,7 +69,8 @@ developer path and troubleshooting: [docs/deploy/quickstart.md](docs/deploy/quic
 **Requirements:** Docker (or Python 3.12 + [uv](https://docs.astral.sh/uv/) + Node 24 +
 ffmpeg for the developer path). **Credentials:** one Gemini API key from
 [Google AI Studio](https://aistudio.google.com/), kept server-side in `.env`; use a project
-with billing enabled for real events. **Models** (all configurable): `gemini-3.5-transcribe-live`
+with billing enabled for real events (new AI Studio accounts are prepay: load at least USD 5 of
+credits, or every call answers `402`; see [docs/troubleshooting.md](docs/troubleshooting.md)). **Models** (all configurable): `gemini-3.5-transcribe-live`
 (captions), `gemini-3.5-flash-lite` (translation), `gemini-3.8-flash-lite-tts` (test audio).
 
 ## Components

@@ -31,6 +31,11 @@ escenario y cada persona lo entiende en su idioma.
 - **Subtítulos en vivo (vista de audiencia):** selector de escenario e idioma, tamaño de
   fuente, alto contraste, modo oscuro, subtítulos accesibles para lectores de pantalla,
   WebSocket con reconexión.
+- **Traducción casi en tiempo real:** pedidos duplicados ante lentitud (hedging), traducción en
+  paralelo publicada en orden, cierre de frases por puntuación y reuso de la traducción parcial
+  mantienen la frase traducida a alrededor de un segundo de la original aunque el modelo demore
+  algunos pedidos (medido en vivo: mediana 0,6 s es→en, 0,8 s en→pt; `docs/metrics.md`).
+- **HTTPS** con tu propio certificado o uno automático de Let's Encrypt (perfil `tls` de Compose).
 - **Traducción en vivo** a cualquier cantidad de idiomas con `gemini-3.5-flash-lite`:
   en streaming, respetando el glosario, con las frases anteriores como contexto; solo se
   traduce mientras alguien escucha (o si el idioma está en `ALWAYS_ON_LANGS`). Cada vista muestra
