@@ -13,8 +13,9 @@ sudo usermod -aG docker "$USER" && newgrp docker
 git clone https://github.com/nahuex/lenguaraz.git && cd lenguaraz
 ```
 
-Open inbound TCP 80/443 (reverse proxy) and the UDP ports of your SRT stages (see
-`docs/deploy/audio-sources.md`). Port 8000 stays private to the host.
+Open inbound TCP 80/443 (HTTPS; add UDP 443 for HTTP/3 with the Caddy profile) and the UDP
+ports of your SRT stages (see `docs/deploy/audio-sources.md`). Port 8000 is published on the
+host's loopback only by `docker-compose.yml`; nothing reaches the app except through TLS.
 
 ## 2. Configuration
 
@@ -38,19 +39,100 @@ Then describe your event in `stages.yaml` (`examples/stages.multitrack.yaml` is 
 starting point) and, optionally, your identity in `branding.yaml`
 (`examples/branding.example.yaml`). Nothing about a specific conference is hardcoded.
 
-## 3. Reverse proxy with TLS
+## 3. HTTPS
 
-Lenguaraz speaks plain HTTP and WebSocket on `:8000`. Put a proxy in front for TLS and
-compression. Caddy does it in four lines (automatic Let's Encrypt certificates):
+Browsers block `ws://` captions from an `https://` page, OBS and vMix embed `https` sources,
+and operators send `ADMIN_TOKEN` over the network: run HTTPS. Pick one of three paths.
 
-```caddyfile
-captions.example.org {
-    reverse_proxy 127.0.0.1:8000
-}
+### A. Your own certificate (Lenguaraz terminates TLS)
+
+Your IT department gave you a certificate for the venue domain. Point Lenguaraz at the PEM
+files and it serves `https://` and `wss://` itself, no extra software. The container runs as
+uid 10001, so make the key readable by that user and by nobody else:
+
+```bash
+mkdir -p certs
+cp /path/to/fullchain.pem certs/fullchain.pem     # leaf first, then intermediates
+cp /path/to/privkey.pem   certs/privkey.pem       # unencrypted PEM
+chmod 600 certs/privkey.pem && sudo chown 10001 certs/privkey.pem
 ```
 
-`docs/security.md` has the equivalent nginx block (WebSocket upgrade on `/ws/`) and the
-security checklist. Do not cache `/ws/` or `/api/`.
+Add the paths **as seen inside the container** to `.env`:
+
+```dotenv
+TLS_CERT_FILE=/app/certs/fullchain.pem
+TLS_KEY_FILE=/app/certs/privkey.pem
+```
+
+Mount the folder read-only and publish 443 instead of loopback 8000 with a
+`docker-compose.override.yml` (Compose merges it automatically):
+
+```yaml
+services:
+  lenguaraz:
+    ports: !override
+      - "443:8000"
+    volumes:
+      - ./certs:/app/certs:ro
+```
+
+```bash
+docker compose up -d
+curl -s https://captions.example.org/healthz      # …,"tls":true}
+```
+
+The audience page derives `wss://` from the page address, so nothing else changes. Rules:
+both files or neither (a lone key or a missing file stops startup with a message naming the
+key); the certificate file holds the full chain; the image healthcheck follows the scheme.
+To renew, replace the files and `docker compose restart lenguaraz`. Path A serves HTTPS only
+(there is no plain-HTTP listener to redirect from): share `https://` links. Without Docker,
+the same two variables with host paths and `uv run lenguaraz serve --port 8443`. For a local
+test, `make tls-selfsigned` writes a self-signed pair into `certs/` (never for an event).
+
+### B. Automatic certificate with Caddy (Let's Encrypt)
+
+You have a public DNS name pointing at this host and no certificate. One Compose profile adds
+[Caddy](https://caddyserver.com/) (official image, Apache-2.0, a separate container) in
+front of Lenguaraz: it obtains and renews the certificate, redirects HTTP to HTTPS, upgrades
+WebSockets, sends HSTS and compresses. `deploy/Caddyfile` is the whole configuration.
+
+```dotenv
+# .env
+DOMAIN=captions.example.org
+ACME_EMAIL=ops@example.org          # Let's Encrypt account contact (optional; default admin@DOMAIN)
+FORWARDED_ALLOW_IPS=*               # trust Caddy's X-Forwarded-For (see below)
+```
+
+```bash
+docker compose --profile tls up -d
+docker compose --profile tls logs -f caddy        # wait for "certificate obtained successfully"
+curl -s https://captions.example.org/healthz      # …,"tls":false}  (TLS ends at Caddy)
+```
+
+Before you start: DNS for `DOMAIN` must already resolve to this host, and inbound TCP 80
+**and** 443 must be open (80 carries the ACME challenge and the redirect; UDP 443 adds
+HTTP/3). `FORWARDED_ALLOW_IPS=*` is safe here because the app port is bound to loopback and
+only Caddy reaches it over the Compose network; it makes the per-IP limit count attendees
+instead of Caddy. Certificates live in the `caddy_data` volume and survive restarts and
+upgrades. Stop everything with `docker compose --profile tls down`.
+
+**Testing tip.** Let's Encrypt limits issuance (5 duplicate certificates per week). While
+you rehearse with a real domain, uncomment the `acme_ca` line in `deploy/Caddyfile` to use
+the **staging** CA (browsers warn, which is expected), then comment it out again and
+`docker compose --profile tls restart caddy` for the real certificate.
+
+### C. You already run nginx, Traefik or Caddy
+
+Keep Lenguaraz on plain HTTP (the default `127.0.0.1:8000`), forward the `/ws/` upgrades and
+tell Lenguaraz which proxy to trust so the per-IP limit and the logs see attendees, not the
+proxy:
+
+```dotenv
+FORWARDED_ALLOW_IPS=127.0.0.1,::1     # proxy on the same host (the default); else its IP or CIDR
+```
+
+The nginx block (WebSocket upgrade, `X-Forwarded-*` headers) and the security checklist are
+in `docs/security.md`. Do not cache `/ws/` or `/api/`.
 
 ## 4. Run
 

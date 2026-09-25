@@ -9,7 +9,7 @@ NPM ?= npm
 COMPOSE ?= docker compose
 
 .PHONY: help verify dev up down logs demo web smoke-stt smoke-translate simulate loadtest samples mvp-check \
-        license-check spdx-check docs-check fresh-clone-test hooks
+        license-check spdx-check docs-check fresh-clone-test hooks tls-selfsigned
 
 help: ## List targets
 	@grep -E '^[a-zA-Z_-]+:.*?## ' $(MAKEFILE_LIST) | awk 'BEGIN {FS = ":.*?## "}; {printf "  %-18s %s\n", $$1, $$2}'
@@ -69,6 +69,9 @@ docs-check: ## Every config key is documented and every relative doc link resolv
 
 fresh-clone-test: ## Clone the public repo into a temp dir and follow quickstart.md in dry-run mode (Docker if available; FRESH_ARGS="--mode local")
 	$(UV) run python scripts/fresh_clone_test.py $(FRESH_ARGS)
+
+tls-selfsigned: ## Self-signed dev certificate in certs/ (never for production)
+	$(UV) run python scripts/selfsigned_cert.py $(TLS_ARGS)
 
 hooks: ## Install the git pre-commit hook (gitleaks + SPDX check)
 	@git config core.hooksPath .githooks && chmod +x .githooks/* scripts/*.sh && echo "hooks: core.hooksPath=.githooks"

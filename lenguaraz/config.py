@@ -9,7 +9,10 @@ environment. Both are validated with pydantic and fail fast with a readable mess
 
 from __future__ import annotations
 
+import logging
+import os
 import re
+import stat
 from enum import StrEnum
 from pathlib import Path
 from typing import Any
@@ -37,6 +40,8 @@ __all__ = [
     "VadMode",
     "short_code",
 ]
+
+log = logging.getLogger("lenguaraz.config")
 
 MAX_GLOSSARY_TERMS = 100
 MAX_GLOSSARY_TERM_CHARS = 64
@@ -262,6 +267,15 @@ class Settings(BaseSettings):
     ws_max_conn_per_ip: int = Field(default=50, ge=1)
     ffmpeg_bin: str = "ffmpeg"
     web_dist: Path | None = None  # built frontend; default: web/dist next to the package
+    # HTTPS served by the process itself (spec 013): both files or neither. TLS_CA_FILE is
+    # handed to uvicorn as ``ssl_ca_certs`` (trusted CAs); intermediates belong in the cert file.
+    tls_cert_file: Path | None = None
+    tls_key_file: Path | None = None
+    tls_ca_file: Path | None = None
+    # Trust X-Forwarded-For / X-Forwarded-Proto from these proxy addresses (comma-separated
+    # IPs or CIDR networks, or ``*``); the per-IP limiter and the logs see the real client.
+    proxy_headers: bool = True
+    forwarded_allow_ips: str = "127.0.0.1,::1"
 
     @model_validator(mode="after")
     def _key_required_for_gemini(self) -> Settings:
@@ -273,6 +287,37 @@ class Settings(BaseSettings):
                 "(set ENGINE=fake for a credential-free dry run)"
             )
         return self
+
+    @model_validator(mode="after")
+    def _tls_files(self) -> Settings:
+        if (self.tls_cert_file is None) != (self.tls_key_file is None):
+            missing = "TLS_KEY_FILE" if self.tls_key_file is None else "TLS_CERT_FILE"
+            raise ValueError(
+                f"{missing} is not set: TLS_CERT_FILE and TLS_KEY_FILE must be set together "
+                "(both for HTTPS, neither for plain HTTP behind a proxy)"
+            )
+        for name, path in (
+            ("TLS_CERT_FILE", self.tls_cert_file),
+            ("TLS_KEY_FILE", self.tls_key_file),
+            ("TLS_CA_FILE", self.tls_ca_file),
+        ):
+            if path is not None and not path.is_file():
+                raise ValueError(f"{name} not found or not a file: {path}")
+        if self.tls_key_file is not None and os.name == "posix":
+            mode = self.tls_key_file.stat().st_mode
+            if mode & (stat.S_IRGRP | stat.S_IROTH):
+                log.warning(
+                    "TLS_KEY_FILE %s is readable by group/others (mode %s); "
+                    "restrict it with chmod 600",
+                    self.tls_key_file,
+                    oct(stat.S_IMODE(mode)),
+                )
+        return self
+
+    @property
+    def tls_enabled(self) -> bool:
+        """True when the process terminates TLS itself (``https://`` and ``wss://``)."""
+        return self.tls_cert_file is not None and self.tls_key_file is not None
 
     @property
     def dry_run(self) -> bool:

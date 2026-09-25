@@ -8,6 +8,17 @@ task ids refer to the specs under `specs/`; the full history is `git log`.
 ## [Unreleased]
 
 ### Added
+- **HTTPS / TLS (013):** `TLS_CERT_FILE` / `TLS_KEY_FILE` (optional `TLS_CA_FILE`) make
+  `lenguaraz serve` terminate TLS itself: `https://` and `wss://` on `PORT`, `"tls": true` in
+  `/healthz`, both files or neither validated at startup, a group/world-readable key warned
+  about on POSIX; `PROXY_HEADERS` / `FORWARDED_ALLOW_IPS` settings so the per-IP limit and
+  the logs see the real client behind a trusted proxy; Compose profile `tls` with Caddy
+  (`deploy/Caddyfile`: automatic Let's Encrypt for `DOMAIN`, HTTP→HTTPS redirect, WebSocket
+  upgrade, HSTS, gzip) and the app port bound to the host's loopback only; `make
+  tls-selfsigned` (git-ignored `certs/`, no OpenSSL binary needed); scheme-aware image
+  healthcheck; `.env` optional for Compose; HTTPS section (own certificate, Caddy, existing
+  proxy) in `docs/deploy/production.md`, proxy trust, HSTS and key handling in
+  `docs/security.md`, mixed-content, certificate and ACME rows in `docs/troubleshooting.md`.
 - **Core pipeline (001):** settings from the environment and a validated `stages.yaml` with
   readable errors; audio ingest with a real-time WAV reader and an ffmpeg subprocess
   for any file, HLS, RTMP, SRT or device source, 3,200-byte PCM chunks; Gemini Live
