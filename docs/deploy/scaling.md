@@ -34,9 +34,26 @@ page, the overlay URL follows the stage id, exports are per stage.
 ## Audience fan-out
 
 Captions are small JSON messages over WebSocket (≈ 200 bytes each, a few per second per
-stage). One process serves thousands of sockets; beyond that, put several Lenguaraz replicas
-behind any HTTP load balancer with sticky sessions per stage, or an HLS/CDN caption track for
-very large audiences (the OBS overlay burns captions into the video for the stream itself).
+stage). Measured with `make loadtest` on 2026-09-25 ([`docs/loadtest-report.md`](../loadtest-report.md);
+fake engine, viewers and server on the same Windows laptop over loopback, 30 s per step):
+
+| Viewers on one stage | Connected | Fan-out spread p50 / p95 (first → last viewer, ms) | Server CPU avg / peak (% of one core) | Server RSS growth |
+|---|---|---|---|---|
+| 100 | 100 / 100 | 5 / 13 | 2.2 / 6.2 | +16 MB |
+| 500 | 500 / 500 | 23 / 49 | 7.3 / 12.5 | +60 MB |
+| 1,000 | 1,000 / 1,000 | 38 / 58 | 7.7 / 18.8 | +75 MB (≈ 150 KB per viewer overall) |
+
+**Viewers per instance:** 1,000 concurrent viewers on one stage cost one instance under a
+fifth of a core at peak, and the last viewer sees a caption 58 ms (p95) after the first one,
+invisible next to the 1–2 s of speech-to-caption latency. The spread grows roughly linearly
+with viewers (the server serializes and sends one frame per socket), so, extrapolating that
+trend rather than measuring it, ≈ 2,000–3,000 viewers per instance per stage keeps the spread
+under ~200 ms. Beyond that, put several Lenguaraz replicas behind any HTTP load balancer with
+sticky sessions per stage, or an HLS/CDN caption track for very large audiences (the OBS
+overlay burns captions into the video for the stream itself). The measured spread is an upper
+bound: the load-test client shared the CPU with the server, and a venue network adds its own
+latency to every viewer alike, not to the spread. Remember `WS_MAX_CONN_PER_IP` (default 50)
+when the whole audience sits behind one NAT address.
 
 ## Beyond one machine (roadmap)
 

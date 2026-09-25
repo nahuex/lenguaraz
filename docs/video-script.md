@@ -4,16 +4,28 @@ Recorded by the owner at checkpoint H4. Screen capture at 1080p, one take per se
 cut together with the on-screen text below. Voice: Rioplatense Spanish (the English SRT is
 produced by Lenguaraz itself, see the last section).
 
-## Setup before recording
+## Recording-day checklist
 
-```bash
-cp examples/env/production.env .env      # ENGINE=gemini, your key, a real ADMIN_TOKEN
-docker compose up --build -d
-```
+In this order; every step is a copy-paste.
 
-`stages.yaml` as shipped (Main Stage EN → es/pt, Workshop ES → en/pt, both looping the
-bundled samples). Open four browser tabs: `/`, `/live/main`, `/live/workshop`,
-`/admin`. OBS with a browser source on `/overlay/main?lang=es&lines=2&size=48`.
+1. **Billing.** Buy prepay credits (minimum USD 5) at https://aistudio.google.com/billing →
+   **Buy credits** (new AI Studio billing accounts are prepay; with USD 0 every call answers
+   `402 prepayment credits are depleted`). Then run `make smoke-stt` and expect
+   `RESULT: PASS` with 7 finals on `samples/en_kubernetes.wav`.
+2. **`.env`.** `cp examples/env/production.env .env` is **not** needed if `.env` already
+   exists: just make sure it has `ENGINE=gemini`, your `GEMINI_API_KEY` and a real
+   `ADMIN_TOKEN`. `stages.yaml` as shipped (Main Stage EN → es/pt, Workshop ES → en/pt, both
+   looping the bundled samples).
+3. **Start.** `docker compose up --build -d`, then `curl -s http://127.0.0.1:8000/healthz`
+   → `{"status":"ok","engine":"gemini","stages":2,…}`.
+4. **Tabs.** Open `/`, `/live/main`, `/live/workshop` and `/admin` (paste the token); OBS
+   with a browser source on `/overlay/main?lang=es&lines=2&size=48`.
+5. **Audio.** Play `samples/en_kubernetes.wav` and `samples/es_asyncio.wav` out loud for the
+   recording (the stages already loop them as their source; the speakers are for the room
+   audio of the video).
+6. **After recording.** Admin → **Export SRT** with language `en` for the narration stage
+   (details in the last section).
+7. **Stop.** `docker compose down`.
 
 ## Shot list
 

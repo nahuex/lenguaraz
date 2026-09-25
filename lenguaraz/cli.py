@@ -1,5 +1,5 @@
 # SPDX-License-Identifier: Apache-2.0
-"""``lenguaraz`` command line: serve, samples, smoke-stt, mvp-check."""
+"""``lenguaraz`` command line: serve, samples, smoke-*, simulate, loadtest, mvp-check."""
 
 from __future__ import annotations
 
@@ -28,6 +28,7 @@ def build_parser() -> argparse.ArgumentParser:
         ("smoke-translate", "translate sample segments with the real model (uses quota)"),
         ("mvp-check", "scripted check of the MVP gates"),
         ("simulate", "run N stages in one process and write the scale report"),
+        ("loadtest", "viewer fan-out load test against a fake-engine server (no quota)"),
     ):
         sub.add_parser(name, help=help_text, add_help=False)  # tool parses its own options
     return parser
@@ -56,6 +57,10 @@ def main(argv: Sequence[str] | None = None) -> int:
             from lenguaraz.tools.simulate import main as simulate_main
 
             return simulate_main(extra)
+        if command == "loadtest":
+            from lenguaraz.tools.loadtest import main as loadtest_main
+
+            return loadtest_main(extra)
         if command == "mvp-check":
             from lenguaraz.tools.mvp_check import main as mvp_main
 

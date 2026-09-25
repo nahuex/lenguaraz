@@ -46,12 +46,14 @@ REQUIRED_DOCS = (
     "docs/metrics.md",
     "docs/operations/runbook.md",
     "docs/devpost.md",
+    "docs/design/brief.md",
     "docs/video-script.md",
     "examples/stages.minimal.yaml",
     "examples/stages.multitrack.yaml",
     "examples/branding.example.yaml",
     "examples/env/dry-run.env",
     "examples/env/production.env",
+    "examples/env/free-tier.env",
 )
 README_SECTIONS = (
     "## Quickstart",

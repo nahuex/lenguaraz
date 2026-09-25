@@ -14,6 +14,7 @@ dependencies = [
     "pydantic-settings>=2.4",
     "pyyaml>=6.0",
     "google-genai>=1.0",
+    "websockets>=13",
 ]
 
 [project.scripts]

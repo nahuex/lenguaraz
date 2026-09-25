@@ -93,3 +93,28 @@ Measured by the project's own tooling (Constitution Art. V.2); definitions below
   number is the first partial of the sentence after the switch: 2716 ms (EN) and 807 ms (ES) in
   these runs, in the same range as sentences without a rotation. Interim counts vary a lot between
   runs server-side (6–80 per 50 s) without affecting finals.
+
+## Viewer fan-out load test
+
+`make loadtest LOAD_ARGS="--viewers 100,500,1000 --seconds 30"`, 2026-09-25 02:38Z, fake
+engine (no Gemini call), one stage (`main`, `lang=en`), viewers and server on the same Windows
+laptop (12 CPUs) over loopback. **Spread** = wall time between the first and the last viewer
+receiving the same caption event (identity: stage, language, `seq`, `is_final`, text), over the
+events that every connected viewer received. Full table, method and honesty note:
+[`docs/loadtest-report.md`](loadtest-report.md).
+
+| Viewers | Connected / failed | Events per viewer (min / median) | Spread p50 / p95 / max ms | Server CPU avg / max % | Server RSS start → end MB | Client CPU avg / max % | Caption msgs/s |
+|---|---|---|---|---|---|---|---|
+| 100 | 100 / 0 | 68 / 68 | 5 / 13 / 19 | 2.2 / 6.2 | 61.0 → 76.9 | 1.4 / 3.1 | 227 |
+| 500 | 500 / 0 | 67 / 67 | 23 / 49 / 55 | 7.3 / 12.5 | 76.9 → 137.0 | 5.5 / 10.9 | 1117 |
+| 1,000 | 1,000 / 0 | 68 / 68 | 38 / 58 / 107 | 7.7 / 18.8 | 137.0 → 212.2 | 5.5 / 15.4 | 2267 |
+
+- RSS is cumulative across the steps (the allocator keeps memory between them): 1,000 sockets
+  ≈ +150 MB over the idle server, ≈ 150 KB per viewer including the two tasks, the bounded
+  queue and the permessage-deflate context of each connection.
+- The spread includes the client process scheduling all its sockets in one event loop, so it
+  is an upper bound for the server's share; a venue network adds latency to every viewer
+  alike, not to the spread. Every viewer received every caption (no drops, no disconnects).
+- An earlier run sampled a 14 MB launcher stub instead of the server (the Windows venv
+  `python.exe` spawns the real interpreter): those CPU/RSS numbers were discarded and the tool
+  now follows to the real process (`docs/decisions.md` D-005-1).
