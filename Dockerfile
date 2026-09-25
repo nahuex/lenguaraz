@@ -42,7 +42,8 @@ RUN chown -R lenguaraz:lenguaraz /app
 
 USER lenguaraz
 EXPOSE 8000
+# The probe follows the scheme the process serves: https when TLS_CERT_FILE is set (spec 013).
 HEALTHCHECK --interval=15s --timeout=3s --start-period=15s --retries=3 \
-    CMD ["/app/.venv/bin/python", "-c", "import sys, urllib.request; sys.exit(0 if urllib.request.urlopen('http://127.0.0.1:8000/healthz', timeout=2).status == 200 else 1)"]
+    CMD ["/app/.venv/bin/python", "-c", "import os, ssl, sys, urllib.request; tls = bool(os.environ.get('TLS_CERT_FILE')); ctx = ssl.create_default_context(); ctx.check_hostname = False; ctx.verify_mode = ssl.CERT_NONE; sys.exit(0 if urllib.request.urlopen(('https' if tls else 'http') + '://127.0.0.1:8000/healthz', timeout=2, context=ctx if tls else None).status == 200 else 1)"]
 
 CMD ["/app/.venv/bin/lenguaraz", "serve"]

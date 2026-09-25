@@ -53,6 +53,24 @@ editing files.
 | `WS_MAX_CONN_PER_IP` | integer ≥ 1 | `50` | Maximum simultaneous caption sockets per client IP. Raise it when many attendees share a NAT. |
 | `FFMPEG_BIN` | path | `ffmpeg` | ffmpeg executable used for non-WAV files and every stream. Local 16 kHz mono WAV files never need ffmpeg. |
 | `WEB_DIST` | path | *(auto)* | Folder with the built audience view. Defaults to `web/dist` next to the package (`/app/web/dist` in the container). |
+| `TLS_CERT_FILE` | path | *(unset)* | PEM certificate for HTTPS served by the process itself (full chain, leaf first). Requires `TLS_KEY_FILE`: with both set, `lenguaraz serve` speaks `https://` and `wss://` on `PORT` and `/healthz` reports `"tls": true`; with neither, plain HTTP for a proxy in front. Validation: the file must exist, and one of the pair without the other stops startup with a message naming the missing key. Example: `certs/dev-cert.pem` (`make tls-selfsigned`, development only), `/app/certs/fullchain.pem` inside the container (`docs/deploy/production.md`, section 3). |
+| `TLS_KEY_FILE` | path | *(unset)* | PEM private key (unencrypted) matching `TLS_CERT_FILE`. Must exist. On POSIX a key readable by group or others logs a warning at startup: keep it `chmod 600`. Never commit it (`certs/` is git-ignored). |
+| `TLS_CA_FILE` | path | *(unset)* | Optional PEM CA bundle handed to uvicorn as `ssl_ca_certs` (trusted CAs; only meaningful when you verify client certificates at the app). Intermediates that browsers need belong in `TLS_CERT_FILE`, not here. Must exist when set. |
+| `PROXY_HEADERS` | boolean | `true` | Honour `X-Forwarded-For` / `X-Forwarded-Proto` from the proxies listed in `FORWARDED_ALLOW_IPS`, so the per-IP socket limit and the logs see the real client instead of the proxy. `false` ignores those headers from everyone. |
+| `FORWARDED_ALLOW_IPS` | comma-separated IPs / CIDRs, or `*` | `127.0.0.1,::1` | Proxies whose forwarding headers are trusted (default: a proxy on the same host). Examples: `10.0.0.5` (nginx on another host), `172.16.0.0/12` (a Docker network), `*` when port 8000 is reachable only through the proxy (the Compose `tls` profile). Headers from any other address are ignored. See `docs/security.md`. |
+
+### Compose `tls` profile (Caddy)
+
+`docker compose --profile tls up -d` reads two more `.env` keys that belong to
+`docker-compose.yml`, not to `Settings` (the app never sees them):
+
+- `DOMAIN` — public DNS name Caddy obtains the certificate for and serves (default
+  `localhost`, which uses Caddy's internal CA; browsers warn).
+- `ACME_EMAIL` — contact email registered with the Let's Encrypt account. Optional: defaults
+  to `admin@<DOMAIN>` because Caddy rejects an empty `email` option.
+
+Set `FORWARDED_ALLOW_IPS=*` with this profile (Caddy reaches the app over the Compose network
+and the app port is bound to loopback only). Details: `docs/deploy/production.md`, section 3.
 
 ### `.env` profiles
 

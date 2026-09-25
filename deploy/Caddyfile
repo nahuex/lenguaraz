@@ -1,0 +1,20 @@
+# SPDX-License-Identifier: Apache-2.0
+# Lenguaraz behind Caddy (docker compose --profile tls up -d): automatic HTTPS from Let's
+# Encrypt for DOMAIN, HTTP -> HTTPS redirect, WebSocket upgrade on /ws/ (automatic), HSTS and
+# gzip. DOMAIN and ACME_EMAIL come from .env through docker-compose.yml, which defaults
+# ACME_EMAIL to admin@DOMAIN because Caddy rejects an empty "email" argument.
+# Testing against a real domain? Use the Let's Encrypt staging CA to stay clear of rate limits:
+# uncomment the acme_ca line below (the browser will warn: the staging root is not trusted).
+{
+	email {$ACME_EMAIL}
+	# acme_ca https://acme-staging-v02.api.letsencrypt.org/directory
+}
+
+{$DOMAIN} {
+	encode gzip
+	header Strict-Transport-Security "max-age=31536000; includeSubDomains"
+	header X-Content-Type-Options nosniff
+	# Caddy sets X-Forwarded-For / X-Forwarded-Proto; set FORWARDED_ALLOW_IPS in .env so
+	# Lenguaraz trusts them (docs/security.md).
+	reverse_proxy lenguaraz:8000
+}

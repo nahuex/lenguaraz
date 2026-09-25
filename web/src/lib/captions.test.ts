@@ -2,16 +2,35 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import {
   applyEvent,
+  buildSocketUrl,
   connectCaptions,
   initialCaptionState,
   MAX_FINALS,
   PING_INTERVAL_MS,
+  socketBase,
   type CaptionEvent,
   type CaptionState,
   type ConnectionState,
   type ServerEvent,
   type WebSocketLike,
 } from './captions';
+
+describe('socketBase', () => {
+  it('uses wss on an https page and ws otherwise (no mixed content)', () => {
+    expect(socketBase({ protocol: 'https:', host: 'captions.example.org' })).toBe(
+      'wss://captions.example.org',
+    );
+    expect(socketBase({ protocol: 'http:', host: 'localhost:8000' })).toBe('ws://localhost:8000');
+  });
+
+  it('derives the default from the current page location', () => {
+    const expected = window.location.protocol === 'https:' ? 'wss' : 'ws';
+    expect(socketBase()).toBe(`${expected}://${window.location.host}`);
+    expect(buildSocketUrl('main', 'es')).toBe(
+      `${expected}://${window.location.host}/ws/main?lang=es`,
+    );
+  });
+});
 
 function caption(seq: number, isFinal: boolean, text = `line ${seq}`): CaptionEvent {
   return {

@@ -174,10 +174,23 @@ export interface CaptionConnection {
   close(): void;
 }
 
+/** The `protocol` and `host` of a page location (a subset of `window.location`). */
+export interface PageLocation {
+  protocol: string;
+  host: string;
+}
+
+/**
+ * WebSocket base URL for the page that is showing: `wss://host` on an `https:` page,
+ * `ws://host` otherwise. Browsers block `ws://` from an `https:` page (mixed content), so
+ * the scheme must follow the page, never be hardcoded.
+ */
+export function socketBase(location: PageLocation = window.location): string {
+  return `${location.protocol === 'https:' ? 'wss' : 'ws'}://${location.host}`;
+}
+
 export function buildSocketUrl(stageId: string, lang: string, baseUrl?: string): string {
-  const base =
-    baseUrl ??
-    `${window.location.protocol === 'https:' ? 'wss' : 'ws'}://${window.location.host}`;
+  const base = baseUrl ?? socketBase();
   return `${base}/ws/${encodeURIComponent(stageId)}?lang=${encodeURIComponent(lang)}`;
 }
 

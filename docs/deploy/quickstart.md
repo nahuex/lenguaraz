@@ -51,10 +51,16 @@ stages:
     glossary: ["Kubernetes", "eBPF", "YourProductName"]
 ```
 
-Restart the container (`docker compose restart`). Share `http://<your-host>:8000/live/main`
-with the audience. Anything ffmpeg can read works as a `source`; `docs/deploy/audio-sources.md` has
-copy-paste recipes for OBS, vMix, HLS and SRT. For a public deployment with TLS see
-`docs/deploy/production.md`; for Google Cloud, `docs/deploy/cloud-run.md`.
+Restart the container (`docker compose restart`). Anything ffmpeg can read works as a
+`source`; `docs/deploy/audio-sources.md` has copy-paste recipes for OBS, vMix, HLS and SRT.
+
+To share it with the audience, put HTTPS in front: the Compose stack listens on
+`127.0.0.1:8000` only, and `docker compose --profile tls up -d` (with `DOMAIN` and
+`ACME_EMAIL` in `.env`) gets a Let's Encrypt certificate, or use your own with
+`TLS_CERT_FILE`/`TLS_KEY_FILE` — both paths in `docs/deploy/production.md`, section 3
+(HTTPS). For a plain-HTTP demo on a LAN, publish the port with a `docker-compose.override.yml`
+(`ports: !override ["8000:8000"]`) and share `http://<your-host>:8000/live/main`. For Google
+Cloud, `docs/deploy/cloud-run.md`.
 
 ## Developer path (without Docker)
 

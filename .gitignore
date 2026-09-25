@@ -4,6 +4,7 @@
 branding/local/
 samples/local/
 MASTER_PROMPT.md
+certs/
 
 # Python
 __pycache__/

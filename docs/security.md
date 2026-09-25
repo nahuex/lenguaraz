@@ -10,10 +10,10 @@ CI hardening live in [`SECURITY.md`](../SECURITY.md).
 | Asset | Threat | Built in | You add |
 |---|---|---|---|
 | Gemini API key | Leak to a browser, a log line or the repo | Server-side only (`SecretStr`), never sent to clients; gitleaks in pre-commit and CI | `.env` on the server only, `chmod 600`, a paid-tier project with a spend cap |
-| Operator API (`/api/admin/*`, `/admin`) | Strangers starting/stopping stages or downloading transcripts | `ADMIN_TOKEN` Bearer, constant-time compare, `401` otherwise | A long random token, TLS, optionally an IP allowlist at the proxy |
-| Audience socket (`/ws/{stage}`) | Connection floods, slow readers, injected messages | Per-IP limit, bounded queues, read-only socket (only `ping` is accepted) | TLS, real client IPs forwarded by the proxy |
+| Operator API (`/api/admin/*`, `/admin`) | Strangers starting/stopping stages or downloading transcripts | `ADMIN_TOKEN` Bearer, constant-time compare, `401` otherwise | A long random token, HTTPS (own certificate or the `tls` profile), optionally an IP allowlist at the proxy |
+| Audience socket (`/ws/{stage}`) | Connection floods, slow readers, injected messages | Per-IP limit, bounded queues, read-only socket (only `ping` is accepted); proxy headers trusted only from `FORWARDED_ALLOW_IPS` | HTTPS, and the proxy's address in `FORWARDED_ALLOW_IPS` |
 | Prompts | A speaker, a glossary or an abstract steering the translation model | Delimited data, angle brackets neutralized, length and output caps | Review glossaries and abstracts before the event |
-| Container | Escalation after a bug | Non-root, read-only filesystem, `no-new-privileges`, Trivy scans | A patched host; port 8000 not published to the internet |
+| Container | Escalation after a bug | Non-root, read-only filesystem, `no-new-privileges`, Trivy scans, app port bound to loopback | A patched host; certificates mounted read-only |
 
 ## The API key
 
@@ -59,14 +59,35 @@ known network, restrict `/api/admin/` and `/admin` to it at the proxy.
 curl -H "Authorization: Bearer $ADMIN_TOKEN" https://captions.example.org/api/admin/stages
 ```
 
-## Reverse proxy and TLS
+## TLS: in the process or at the proxy
 
-Lenguaraz serves plain HTTP on `PORT` (8000). Put a TLS-terminating reverse proxy in front,
-publish only the proxy, and bind the app to loopback (`ports: ["127.0.0.1:8000:8000"]` in
-`docker-compose.yml`). WebSocket upgrades on `/ws/` must be forwarded; listeners receive a
-`metrics` event a few times a minute, so default idle timeouts are fine.
+Three ways to get `https://` (and with it `wss://` captions: browsers block `ws://` from an
+`https://` page), step by step in [`deploy/production.md`](deploy/production.md#3-https):
+**A.** your own certificate served by Lenguaraz itself (`TLS_CERT_FILE` / `TLS_KEY_FILE`;
+uvicorn terminates TLS on `PORT`, `/healthz` reports `"tls": true`); **B.** the Compose
+`tls` profile, which puts Caddy in front with an automatic Let's Encrypt certificate
+(`deploy/Caddyfile`); **C.** a proxy you already run. In every case `docker-compose.yml`
+publishes port 8000 on the host's loopback only, so the app is never reachable directly
+from outside; WebSocket upgrades on `/ws/` must be forwarded by any proxy, and listeners
+receive a `metrics` event a few times a minute, so default idle timeouts are fine.
 
-Caddy (automatic certificates; WebSockets need no extra directive):
+**Certificate and key files (path A).** PEM, unencrypted key, full chain (leaf first) in the
+certificate file. Keep the key `chmod 600` and owned by the user that runs the process (uid
+10001 inside the container; `sudo chown 10001` on the host copy); on POSIX a key readable by
+group or others logs a warning at startup. `certs/` is git-ignored: **never commit a
+certificate or a private key**, and rotate the key if one ever reached a repository or a
+chat. `make tls-selfsigned` is a developer convenience (browsers do not trust it).
+`TLS_CA_FILE` is uvicorn's `ssl_ca_certs` (trusted CAs for client certificates), not the
+way to serve intermediates.
+
+**HSTS.** The Caddy profile sends `Strict-Transport-Security: max-age=31536000;
+includeSubDomains`: once a browser has seen the site over HTTPS it refuses plain HTTP for a
+year, which also protects the admin token from a downgrade. Only enable it (in nginx:
+`add_header Strict-Transport-Security "max-age=31536000; includeSubDomains" always;`) on a
+domain that will stay HTTPS. Path A serves HTTPS only and has no plain-HTTP listener, so it
+neither redirects nor needs the header; share `https://` links and QR codes.
+
+Caddy on the host (path C; automatic certificates, WebSockets need no extra directive):
 
 ```caddyfile
 captions.example.org {
@@ -101,13 +122,17 @@ server {
 }
 ```
 
-**Client IPs behind a proxy.** The per-IP limit counts the address the server sees. The
-uvicorn server inside Lenguaraz trusts `X-Forwarded-For` only from `127.0.0.1` and `::1` by
-default; with the proxy in another container or host, every attendee looks like the proxy's
-IP and the whole audience hits `WS_MAX_CONN_PER_IP` at once. Set uvicorn's
-`FORWARDED_ALLOW_IPS` (a uvicorn variable, not a Lenguaraz setting) to the proxy's address, or
-to `*` when port 8000 is reachable only through the proxy, in `.env` or the compose
-`environment:` block.
+**Proxy trust: `PROXY_HEADERS` and `FORWARDED_ALLOW_IPS`.** The per-IP limit
+(`WS_MAX_CONN_PER_IP`) and the `listener connected from <ip>` log line use the client address
+the server sees. Behind a proxy that is the proxy's address, unless the proxy is listed in
+`FORWARDED_ALLOW_IPS` (default `127.0.0.1,::1`: a proxy on the same host), in which case its
+`X-Forwarded-For` / `X-Forwarded-Proto` headers are honoured (`PROXY_HEADERS=true`, the
+default). Getting it wrong hurts in both directions: with the proxy **not** trusted, every
+attendee looks like the proxy and the whole audience hits `WS_MAX_CONN_PER_IP` at once; with
+`*` on a port strangers can reach, anyone can forge `X-Forwarded-For` and dodge the limit.
+Set the proxy's IP or CIDR (`10.0.0.5`, `172.16.0.0/12`), and use `*` only when port 8000 is
+reachable exclusively through the proxy, as in the Compose `tls` profile (loopback binding
+plus the private Compose network). `PROXY_HEADERS=false` ignores the headers from everyone.
 
 ## Rate limits and backpressure
 
@@ -170,7 +195,8 @@ treat any credential that ever sat in a `source` URL as exposed if that feed fai
 
 - [ ] `ADMIN_TOKEN` is long and random; `GEMINI_API_KEY` is from a paid-tier project with a
       spend cap; `.env` is `chmod 600`.
-- [ ] TLS proxy in front; port 8000 bound to loopback; `FORWARDED_ALLOW_IPS` set for the proxy.
+- [ ] HTTPS on (own certificate, the `tls` profile or your proxy); port 8000 left on loopback
+      (the default); `FORWARDED_ALLOW_IPS` names your proxy; no certificate or key in git.
 - [ ] `/api/admin/` and `/admin` reachable only by the production team (network or VPN).
 - [ ] `WS_MAX_CONN_PER_IP` sized for the venue NAT (audience size ÷ public addresses).
 - [ ] No credentials inside `source` URLs; glossaries and abstracts reviewed.

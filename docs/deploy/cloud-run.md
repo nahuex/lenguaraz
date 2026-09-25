@@ -32,9 +32,12 @@ gcloud run deploy lenguaraz \
   --min-instances 1 --max-instances 1 \
   --concurrency 250 --timeout 3600 --no-cpu-throttling --session-affinity \
   --set-secrets "GEMINI_API_KEY=gemini-api-key:latest,ADMIN_TOKEN=admin-token:latest,/config/stages.yaml=stages-yaml:latest" \
-  --set-env-vars "ENGINE=gemini,STAGES_FILE=/config/stages.yaml,HOST=0.0.0.0,PORT=8000"
+  --set-env-vars "ENGINE=gemini,STAGES_FILE=/config/stages.yaml,HOST=0.0.0.0,PORT=8000,FORWARDED_ALLOW_IPS=*"
 ```
 
+Cloud Run terminates TLS at Google's front end and forwards `X-Forwarded-For`;
+`FORWARDED_ALLOW_IPS=*` makes the per-IP socket limit count attendees rather than that front
+end, and is safe because the instance is reachable only through it (`docs/security.md`).
 `--timeout 3600` is the Cloud Run maximum for HTTP/WebSocket requests: audience browsers
 reconnect automatically when the hour is up (the live captions client backs off and resumes).
 `--no-cpu-throttling` keeps the CPU allocated between requests, which the ffmpeg decoders

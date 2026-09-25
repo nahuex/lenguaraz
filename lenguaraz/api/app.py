@@ -94,6 +94,7 @@ def create_app(
             "engine": settings.engine.value,
             "stages": len(manager.runners),
             "version": __version__,
+            "tls": settings.tls_enabled,
         }
 
     @app.get("/api/stages")

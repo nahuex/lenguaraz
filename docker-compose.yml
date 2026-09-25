@@ -1,23 +1,57 @@
 # SPDX-License-Identifier: Apache-2.0
 # One command to run: cp .env.example .env && docker compose up
 # Stages are configuration (stages.yaml); samples/ holds the bundled test audio.
+# HTTPS: docker compose --profile tls up -d  (Caddy + Let's Encrypt for DOMAIN; see docs/deploy/production.md)
 services:
   lenguaraz:
     build: .
     image: lenguaraz:local
-    env_file: .env
+    env_file:
+      - path: .env
+        required: false   # defaults apply without it (ENGINE=gemini then needs GEMINI_API_KEY)
     environment:
       HOST: 0.0.0.0
       PORT: "8000"
       STAGES_FILE: /app/stages.yaml
     ports:
-      - "8000:8000"
+      # Loopback only: the host reaches http://127.0.0.1:8000; the public side is Caddy
+      # (profile tls) or your own proxy. Override in docker-compose.override.yml to publish it.
+      - "127.0.0.1:8000:8000"
     volumes:
       - ./stages.yaml:/app/stages.yaml:ro
       - ./samples:/app/samples:ro
+      # In-process TLS (path A in docs/deploy/production.md): mount your certificate read-only
+      # and set TLS_CERT_FILE=/app/certs/<cert>.pem TLS_KEY_FILE=/app/certs/<key>.pem in .env
+      # - ./certs:/app/certs:ro
     read_only: true
     tmpfs:
       - /tmp
     security_opt:
       - no-new-privileges:true
     restart: unless-stopped
+
+  # Automatic HTTPS (path B): docker compose --profile tls up -d
+  # Needs DOMAIN (public DNS name pointing at this host) and ACME_EMAIL in .env, and inbound
+  # TCP 80/443 (+ UDP 443 for HTTP/3). Caddy (Apache-2.0) runs as a separate container.
+  caddy:
+    image: caddy:2
+    profiles: ["tls"]
+    depends_on:
+      - lenguaraz
+    ports:
+      - "80:80"
+      - "443:443"
+      - "443:443/udp"
+    environment:
+      DOMAIN: ${DOMAIN:-localhost}
+      # Caddy rejects an empty "email"; the ACME account contact defaults to admin@DOMAIN.
+      ACME_EMAIL: ${ACME_EMAIL:-admin@${DOMAIN:-localhost}}
+    volumes:
+      - ./deploy/Caddyfile:/etc/caddy/Caddyfile:ro
+      - caddy_data:/data
+      - caddy_config:/config
+    restart: unless-stopped
+
+volumes:
+  caddy_data:
+  caddy_config:
