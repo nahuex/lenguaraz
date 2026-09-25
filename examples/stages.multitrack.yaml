@@ -7,7 +7,7 @@ stages:
     name: "Main Stage"
     source: "srt://0.0.0.0:9000?mode=listener&latency=200000"   # encoder → SRT caller
     source_lang: ["en-US"]           # what the speakers speak (BCP-47)
-    targets: ["es", "pt-BR"]         # languages the audience can pick
+    targets: ["es", "pt"]         # languages the audience can pick
     talk:
       title: "Opening keynote: platform engineering in 2026"
       abstract: "Internal developer platforms, Backstage, Crossplane and the SRE handoff."
@@ -27,7 +27,7 @@ stages:
     name: "Workshop Room (Spanish)"
     source: "https://cdn.example.org/live/workshop/index.m3u8"   # HLS adds a few seconds
     source_lang: ["es-419"]
-    targets: ["en", "pt-BR"]
+    targets: ["en", "pt"]
     talk:
       title: "Taller: observabilidad con OpenTelemetry"
       abstract: "Trazas, métricas y logs con el Collector, Prometheus y Grafana."

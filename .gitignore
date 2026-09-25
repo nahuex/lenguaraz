@@ -30,3 +30,6 @@ exports/
 Thumbs.db
 .idea/
 .vscode/
+
+# Local compose overrides (ports for a demo, etc.)
+docker-compose.override.yml

@@ -54,3 +54,24 @@ The subtitles of the video are produced by Lenguaraz, not by an editor:
 
 Timestamps in the SRT are relative to the stage start, so start the stage together with the
 recording (or offset them in the editor).
+
+## Recording with a real Nerdearla talk (OBS → SRT)
+
+The challenge asks for real talk audio (any previous Nerdearla talk on YouTube). Play it in
+the browser and let OBS feed Lenguaraz over SRT while it records the screen:
+
+1. Add a stage that listens on SRT (local `stages.yaml`, not committed):
+   `source: "srt://0.0.0.0:9000?mode=listener&latency=200000"`, `source_lang: ["es-419"]`,
+   `targets: ["en", "pt"]`; publish UDP 9000 with a `docker-compose.override.yml`
+   (`ports: ["9000:9000/udp"]`) and `docker compose up -d`.
+2. OBS → Settings → Stream: service *Custom…*, server `srt://127.0.0.1:9000?mode=caller&latency=200000`,
+   empty stream key. Output → Streaming: audio encoder AAC 128 kbps (video bitrate low, it is ignored).
+   Audio Mixer → Advanced Audio Properties: *Desktop Audio* on tracks 1+2, *Mic* on track 2 only;
+   Output → Advanced: stream uses track 1 (talk only), recording uses tracks 1+2 (talk + narration).
+3. Order: Admin → stage **Start** (LIVE, waiting) → OBS **Start Streaming** → OBS **Start Recording**
+   → play the talk on YouTube. Open `/live/charla`, switch to English; optional overlay
+   `/overlay/charla?lang=en&lines=2&size=48` as an OBS browser source.
+4. After: Stop Recording, Stop Streaming, Admin → **Export SRT** (`en`) — timestamps count from
+   the stage Start, so start the recording right after the stage and trim the video head to match.
+5. Fallback without OBS: `ffmpeg -f dshow -i audio="<your microphone>" -c:a aac -f mpegts
+   "srt://127.0.0.1:9000?mode=caller"` captures the speakers and your voice.
