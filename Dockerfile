@@ -10,7 +10,7 @@ COPY web/ ./
 RUN npm run build
 
 # --- stage 2: runtime ----------------------------------------------------------------------
-FROM python:3.12-slim AS runtime
+FROM python:3.14-slim AS runtime
 
 ENV PYTHONUNBUFFERED=1 \
     PYTHONDONTWRITEBYTECODE=1 \
