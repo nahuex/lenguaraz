@@ -32,7 +32,9 @@ export function LanguagePicker({ options, value, onChange }: LanguagePickerProps
             <div key={option.code} className="flex items-center gap-2">
               <RadioGroupItem id={itemId} value={option.code} />
               <Label htmlFor={itemId} className="cursor-pointer text-base">
-                {option.original ? `${option.label} (original)` : option.label}
+                {option.original
+                  ? `${option.label} (original audio)`
+                  : `${option.label} (translation)`}
               </Label>
             </div>
           );

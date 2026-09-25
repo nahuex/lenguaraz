@@ -152,7 +152,7 @@ describe('LiveCaptions', () => {
 
     // The language picker lives on the page with its accessible name.
     expect(screen.getByRole('radiogroup', { name: 'Caption language' })).toBeInTheDocument();
-    expect(screen.getByRole('radio', { name: 'Spanish' })).toBeChecked();
+    expect(screen.getByRole('radio', { name: 'Spanish (translation)' })).toBeChecked();
   });
 
   it('lets the audience choose how many caption lines to show', () => {

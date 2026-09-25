@@ -47,9 +47,9 @@ export function StageCard({ stage }: StageCardProps) {
       </CardHeader>
       <CardContent>
         <dl className="grid grid-cols-[auto_1fr] gap-x-3 gap-y-1">
-          <dt className="text-muted-foreground">Spoken language</dt>
+          <dt className="text-muted-foreground">Original audio</dt>
           <dd>{spoken.length > 0 ? spoken.join(', ') : '—'}</dd>
-          <dt className="text-muted-foreground">Captions in</dt>
+          <dt className="text-muted-foreground">Captions in (original + translations)</dt>
           <dd>{captionsIn.length > 0 ? captionsIn.join(', ') : '—'}</dd>
           <dt className="text-muted-foreground">Watching now</dt>
           <dd>{stage.listeners}</dd>

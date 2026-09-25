@@ -78,8 +78,8 @@ describe('Home', () => {
     const main = cards[0];
     expect(within(main).getByRole('heading', { level: 2, name: 'Main Stage' })).toBeInTheDocument();
     expect(within(main).getByText('LIVE')).toHaveAttribute('data-state', 'LIVE');
-    expect(definition(main, 'Spoken language')).toBe('English');
-    expect(definition(main, 'Captions in')).toBe('English, Spanish, Portuguese');
+    expect(definition(main, 'Original audio')).toBe('English');
+    expect(definition(main, 'Captions in (original + translations)')).toBe('English, Spanish, Portuguese');
     expect(definition(main, 'Watching now')).toBe('12');
     expect(
       within(main).getByRole('link', { name: 'Open live captions for Main Stage' }),
@@ -91,8 +91,8 @@ describe('Home', () => {
     const workshop = cards[1];
     expect(within(workshop).getByText('STOPPED')).toHaveAttribute('data-state', 'STOPPED');
     expect(within(workshop).getByText('Ends at 18:00')).toBeInTheDocument();
-    expect(definition(workshop, 'Spoken language')).toBe('Spanish');
-    expect(definition(workshop, 'Captions in')).toBe('Spanish, English');
+    expect(definition(workshop, 'Original audio')).toBe('Spanish');
+    expect(definition(workshop, 'Captions in (original + translations)')).toBe('Spanish, English');
 
     // One stage runs on the fake engine: the dry-run badge replaces the loading status.
     expect(screen.getByRole('status')).toHaveTextContent(
