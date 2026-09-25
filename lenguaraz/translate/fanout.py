@@ -67,6 +67,7 @@ class _Language:
     rate_limited: int = 0
     untranslated: int = 0
     hedged: int = 0
+    last_final_seq: int = -1
 
 
 class TranslationFanout:
@@ -199,9 +200,18 @@ class TranslationFanout:
             started = self._clock()
             text = await self._translate(code, lang, event, is_final=True)
             if previous is not None:
-                await previous  # keep publication order
+                # keep publication order, but never let one slow sentence freeze the view
+                wait = self._settings.translate_order_wait_ms / 1000.0
+                with contextlib.suppress(TimeoutError):
+                    await asyncio.wait_for(asyncio.shield(previous), wait)
             if text is not None:
-                self._publish(code, event, text, is_final=True, started=started)
+                if event.seq < lang.last_final_seq:
+                    # a later sentence is already on screen: showing this one now would
+                    # break the order, so it is left out of this language
+                    self._skip(code, lang, True, "arrived after a later sentence")
+                else:
+                    lang.last_final_seq = event.seq
+                    self._publish(code, event, text, is_final=True, started=started)
         finally:
             if not mine.done():
                 mine.set_result(None)

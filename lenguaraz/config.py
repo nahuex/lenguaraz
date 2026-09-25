@@ -258,6 +258,7 @@ class Settings(BaseSettings):
     translate_concurrency: int = Field(default=4, ge=1, le=16)
     translate_hedge_after_ms: int = Field(default=1200, ge=0, le=30000)
     translate_hedges: int = Field(default=2, ge=0, le=4)
+    translate_order_wait_ms: int = Field(default=1500, ge=0, le=30000)
     auto_glossary: bool = True
     auto_glossary_max_terms: int = Field(default=60, ge=1, le=100)
     gemini_translate_api: str = Field(

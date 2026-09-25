@@ -283,3 +283,23 @@ async def test_no_hedge_when_the_first_call_is_fast(bus: MemoryBus) -> None:
     assert [e.text for e in events] == ["[es] Quick."]
     assert len(translator.requests) == 1 and fanout.hedged() == 0
     await fanout.stop()
+
+
+async def test_one_slow_sentence_does_not_freeze_the_following_ones(bus: MemoryBus) -> None:
+    translator = SlowThenFastTranslator([2.0, 0.05, 0.05])
+    fanout = TranslationFanout(
+        STAGE,
+        translator,
+        bus,
+        settings(translate_hedges=0, translate_order_wait_ms=200, translate_timeout_seconds=5),
+        sleep=fast_sleep,
+    )
+    es = bus.subscribe("main", lang="es")
+    for seq in range(3):
+        fanout.on_caption(caption(seq, f"Sentence {seq}."))
+    events = await drain(es, 0.8)
+    assert [e.seq for e in events] == [1, 2]  # not held back by the slow first sentence
+    await asyncio.sleep(1.6)  # the slow one finishes after later sentences were shown
+    assert fanout.untranslated() == 1  # dropped, the on-screen order never breaks
+    assert await drain(es, 0.2) == []
+    await fanout.stop()
