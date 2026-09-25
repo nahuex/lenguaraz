@@ -115,16 +115,22 @@ describe('Admin', () => {
     vi.unstubAllGlobals();
   });
 
-  it('renders only the token form and the health summary without a token', async () => {
+  it('renders only the sign-in form and the health summary without a token', async () => {
     stubFetch(200);
     renderPage();
 
+    expect(document.title).toBe('Operator dashboard · Lenguaraz');
     expect(screen.getByRole('heading', { name: 'Operator dashboard' })).toBeInTheDocument();
-    expect(screen.getByLabelText('Admin token')).toHaveAttribute('type', 'password');
-    expect(screen.getByLabelText('Admin token')).toHaveAccessibleDescription(
-      "The ADMIN_TOKEN value from the server's .env",
-    );
-    expect(screen.getByRole('button', { name: 'Sign in' })).toBeInTheDocument();
+    expect(screen.getByRole('link', { name: 'All stages' })).toHaveAttribute('href', '/');
+
+    const form = screen.getByRole('form', { name: 'Admin sign-in' });
+    const input = within(form).getByLabelText('Admin token');
+    expect(input).toHaveAttribute('type', 'password');
+    expect(input).toBeEnabled();
+    expect(input).toHaveAccessibleDescription("The ADMIN_TOKEN value from the server's .env");
+    expect(within(form).getByRole('button', { name: 'Sign in' })).toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: 'Sign out' })).toBeNull();
+    expect(screen.queryByRole('alert')).toBeNull();
     expect(screen.queryByRole('table')).toBeNull();
     expect(screen.queryByRole('region', { name: 'Stages' })).toBeNull();
 
@@ -139,6 +145,7 @@ describe('Admin', () => {
 
     expect(await screen.findByRole('alert')).toHaveTextContent('Invalid token');
     expect(window.sessionStorage.getItem(ADMIN_TOKEN_KEY)).toBeNull();
+    expect(screen.getByLabelText('Admin token')).toBeEnabled();
     expect(screen.getByRole('button', { name: 'Sign in' })).toBeInTheDocument();
     expect(screen.queryByRole('table')).toBeNull();
   });
@@ -148,24 +155,37 @@ describe('Admin', () => {
     renderPage();
     connectWith('secret');
 
+    // Skeleton rows announce the load until the first poll answers.
+    expect(screen.getByRole('status')).toHaveTextContent('Loading stages…');
+
     const table = await screen.findByRole('table');
+    expect(screen.queryByRole('status')).toBeNull();
     expect(window.sessionStorage.getItem(ADMIN_TOKEN_KEY)).toBe('secret');
+    expect(screen.getByLabelText('Admin token')).toBeDisabled();
     expect(screen.getByRole('button', { name: 'Sign out' })).toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: 'Sign in' })).toBeNull();
+
     // Operator vocabulary in the column headers (same text at every width).
     expect(
-      within(table).getByText('Latency p50 / p95 (ms)', { selector: 'th' }),
+      within(table).getByRole('columnheader', { name: 'Latency p50 / p95 (ms)' }),
     ).toBeInTheDocument();
     expect(
-      within(table).getByText('Rotations · Errors · Duplicates · Dropped', { selector: 'th' }),
+      within(table).getByRole('columnheader', {
+        name: 'Rotations · Errors · Duplicates · Dropped',
+      }),
     ).toBeInTheDocument();
-    expect(within(table).getByText('Main Stage', { selector: 'strong' })).toBeInTheDocument();
-    expect(within(table).getByText('Workshop Room', { selector: 'strong' })).toBeInTheDocument();
+
+    // The stage name is the row header; the dry-run marker sits next to it.
+    const mainRow = within(table).getByRole('rowheader', { name: /Main Stage/ });
+    expect(within(mainRow).getByText('Dry run')).toBeInTheDocument();
+    expect(within(table).getByRole('rowheader', { name: /Workshop Room/ })).toBeInTheDocument();
 
     const badges = within(table).getAllByText(/^(LIVE|STOPPED)$/);
     expect(badges.map((el) => el.getAttribute('data-state'))).toEqual(['LIVE', 'STOPPED']);
     expect(within(table).getByText('$0.1234')).toBeInTheDocument();
     expect(within(table).getByText('$0.5000')).toBeInTheDocument();
     // Totals row: LIVE / total, listeners and cost sum.
+    expect(within(table).getByRole('rowheader', { name: 'Totals' })).toBeInTheDocument();
     expect(within(table).getByText('1 LIVE / 2')).toBeInTheDocument();
     expect(within(table).getByText('$0.6234')).toBeInTheDocument();
 
@@ -176,6 +196,14 @@ describe('Admin', () => {
     expect(screen.getByRole('button', { name: 'Start Main Stage' })).toBeDisabled();
     expect(screen.getByRole('button', { name: 'Stop Workshop Room' })).toBeDisabled();
     expect(screen.getByRole('button', { name: 'Start Workshop Room' })).toBeEnabled();
+
+    // One export button per format, plus the language picker, per stage.
+    expect(screen.getByRole('button', { name: 'SRT export for Main Stage' })).toBeEnabled();
+    expect(screen.getByRole('button', { name: 'VTT export for Main Stage' })).toBeEnabled();
+    expect(screen.getByRole('button', { name: 'TXT export for Main Stage' })).toBeEnabled();
+    expect(screen.getByRole('combobox', { name: 'Export language for Main Stage' })).toHaveValue(
+      'en',
+    );
 
     const stop = screen.getByRole('button', { name: 'Stop Main Stage' });
     expect(stop).toBeEnabled();
@@ -206,5 +234,20 @@ describe('Admin', () => {
       'href',
       '/overlay/main?lang=en',
     );
+  });
+
+  it('signs out on demand and drops the stored token', async () => {
+    stubFetch(200);
+    renderPage();
+    connectWith('secret');
+    await screen.findByRole('table');
+
+    fireEvent.click(screen.getByRole('button', { name: 'Sign out' }));
+
+    expect(window.sessionStorage.getItem(ADMIN_TOKEN_KEY)).toBeNull();
+    expect(screen.queryByRole('table')).toBeNull();
+    expect(screen.queryByRole('alert')).toBeNull();
+    expect(screen.getByRole('button', { name: 'Sign in' })).toBeInTheDocument();
+    expect(screen.getByLabelText('Admin token')).toHaveValue('');
   });
 });

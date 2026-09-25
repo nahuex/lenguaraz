@@ -1,17 +1,22 @@
 // SPDX-License-Identifier: Apache-2.0
+import type { ComponentProps } from 'react';
+import { Badge } from '@/components/ui/badge';
 import type { StageState } from '../lib/api';
 
+type BadgeVariant = NonNullable<ComponentProps<typeof Badge>['variant']>;
+
 /**
- * Solid badge per stage state. Each background/text pair keeps >= 4.5:1
- * contrast on its own, so the badge reads the same in every theme.
+ * Badge variant per stage state. LIVE is the one highlighted state (primary, i.e. the brand
+ * colour); DEGRADED warns; STARTING and ROTATING are transitional; IDLE and STOPPED stay
+ * quiet. The state word is always rendered, so colour is never the only cue.
  */
-const STYLES: Record<StageState, string> = {
-  LIVE: 'bg-[#22c55e] text-[#052e16]',
-  STARTING: 'bg-[#f59e0b] text-[#451a03]',
-  ROTATING: 'bg-[#f59e0b] text-[#451a03]',
-  DEGRADED: 'bg-[#f97316] text-[#431407]',
-  IDLE: 'bg-[#9ca3af] text-[#111827]',
-  STOPPED: 'bg-[#9ca3af] text-[#111827]',
+const VARIANTS: Record<StageState, BadgeVariant> = {
+  LIVE: 'default',
+  STARTING: 'secondary',
+  ROTATING: 'secondary',
+  DEGRADED: 'destructive',
+  IDLE: 'outline',
+  STOPPED: 'outline',
 };
 
 interface StateBadgeProps {
@@ -19,13 +24,13 @@ interface StateBadgeProps {
 }
 
 export function StateBadge({ state }: StateBadgeProps) {
-  const style = STYLES[state] ?? STYLES.IDLE;
   return (
-    <span
-      className={`inline-block rounded-full px-2.5 py-0.5 text-xs font-bold uppercase tracking-wide ${style}`}
+    <Badge
+      variant={VARIANTS[state] ?? 'outline'}
       data-state={state}
+      className="font-semibold tracking-wide"
     >
       {state}
-    </span>
+    </Badge>
   );
 }
