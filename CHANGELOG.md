@@ -7,6 +7,18 @@ task ids refer to the specs under `specs/`; the full history is `git log`.
 
 ## [Unreleased]
 
+_Nothing yet._
+
+## [1.1.0] - 2026-09-25
+
+Near-real-time translation on a congested standard tier (measured live on a Nerdearla talk streamed from OBS).
+
+### Added
+- Hedged translation requests (`TRANSLATE_HEDGE_AFTER_MS`, `TRANSLATE_HEDGES`): a slow call gets an identical copy, the first answer wins.
+- Parallel translation per language with in-order publication (`TRANSLATE_CONCURRENCY`) and a head-of-line cap (`TRANSLATE_ORDER_WAIT_MS`).
+- Sentence segmentation of live partials at punctuation (28-word cap), tolerant cut of cumulative partials, one caption line per sentence, reuse of the progressive translation as the final, short fragments held until the sentence completes.
+- Translation timeout (`TRANSLATE_TIMEOUT_SECONDS`), WebSocket close codes reopen the session, faster stall recovery.
+
 ### Changed
 - Each language view shows only its own language: a failed, timed-out (`TRANSLATE_TIMEOUT_SECONDS`) or rate-limited translation is skipped in that language and counted (`translation_untranslated`), never replaced by the source text. Picker labels read "X (original audio)" / "Y (translation)".
 
@@ -134,7 +146,8 @@ approves the tag after reviewing the simulator report and the fresh-clone test.
 MVP milestone: features 001–002 above will move here when the owner approves the tag after
 the live two-stage demo.
 
-[Unreleased]: https://github.com/nahuex/lenguaraz/compare/v1.0.0...HEAD
+[Unreleased]: https://github.com/nahuex/lenguaraz/compare/v1.1.0...HEAD
+[1.1.0]: https://github.com/nahuex/lenguaraz/compare/v1.0.0...v1.1.0
 [1.0.0]: https://github.com/nahuex/lenguaraz/compare/v0.1.0...v1.0.0
 [0.2.0]: https://github.com/nahuex/lenguaraz/compare/v0.1.0...v0.2.0
 [0.1.0]: https://github.com/nahuex/lenguaraz/releases/tag/v0.1.0

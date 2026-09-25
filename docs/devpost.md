@@ -43,6 +43,10 @@ who travelled with the expeditions across the Pampas.
   viewers per instance with a p95 fan-out spread of 58 ms; any audio ffmpeg can read (SRT, RTMP, HLS,
   files), HTTPS with your own certificate or automatic Let's Encrypt via a Caddy profile, non-root
   read-only container, and a credential-free dry-run mode.
+- Near-real-time translation even when the model queues requests: hedged requests (a second copy
+  after 600 ms, first answer wins), parallel translation with in-order publication, sentence
+  segmentation of live partials and reuse of the partial translation — measured live on a
+  Nerdearla talk: **0.6 s median** from the Spanish sentence to the English one.
 - Keeps captions flowing on bad API days: if the server never commits a sentence, the last partial
   is promoted to a final after 3 s; a 429 pauses translation for the server's hint and shows the original.
 - Audience, overlay and operator pages on an accessible design system (shadcn/ui, Radix), with

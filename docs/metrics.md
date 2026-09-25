@@ -123,3 +123,24 @@ events that every connected viewer received. Full table, method and honesty note
 - An earlier run sampled a 14 MB launcher stub instead of the server (the Windows venv
   `python.exe` spawns the real interpreter): those CPU/RSS numbers were discarded and the tool
   now follows to the real process (`docs/decisions.md` D-005-1).
+
+## Live translation latency (2026-09-25)
+
+Measured on the real engine with a previous Nerdearla talk played in a browser and streamed
+from OBS over SRT (stages `charla` es→en/pt and `charla-en` en→es/pt), 40–60 s windows, with
+the standard-tier text model answering in 0.7–2 s for most calls and 11–40 s for some
+(parallel probe: 38.3 s, 1.6 s, 1.7 s — latency is per request).
+
+| Build | Source final → translated final | Notes |
+|---|---|---|
+| 12:00Z (no hedging, finals only) | 5–30 s, sentences skipped | one slow call held every later sentence |
+| 15:15Z (hedging, isolated fan-out) | 0.7–5.7 s (median ≈ 1.8 s) vs 3.5–12 s without | same sentences, same minute |
+| 15:45Z (segmentation + reuse, es→en live) | **median 0.6 s** (0.0–1.4 s), 15/15 translated | 0.0 s = progressive translation reused |
+| 15:47Z (es→pt live) | median 1.05 s, 8/8 | |
+| 16:08Z (en→pt live) | median 0.8 s, 6/6 | |
+
+Method: `scripts`-free WebSocket listeners on `/ws/{stage}?lang=` for the source and the
+target language; per caption `seq`, the difference between the arrival of the source final
+and the translated final. Gemini Live Translate (`gemini-3.5-live-translate-preview`) was also
+probed: its text follows the synthesized speech and lagged 5→23 s, so it is not used for
+captions. Priority inference would help further but requires Tier 2/3.
